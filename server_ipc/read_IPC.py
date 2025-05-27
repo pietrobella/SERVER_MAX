@@ -338,5 +338,5 @@ def parse_ipc2581_and_populate_db(file_path, session=None):
 
 # Example usage
 if __name__ == "__main__":
-    result = parse_ipc2581_and_populate_db("server_ipc/testcase3.cvg")
+    result = parse_ipc2581_and_populate_db("server_ipc/MB1136.cvg")
     print(result)

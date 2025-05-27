@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
+from voice_assistant_for_server import process_wav_file 
 
 app = Flask(__name__)
 CORS(app)  # Abilita CORS per tutte le route
@@ -86,11 +87,6 @@ def server_error(e):
 
 # Funzione di assistenza vocale (placeholder)
 
-def voice_assistance(wav_file):
-    # Qui andrà la logica vera, per ora simuliamo una risposta
-    # wav_file è un oggetto FileStorage di Flask
-    return {"status": "ok", "message": "File ricevuto", "filename": wav_file.filename}
-
 @app.route('/voice-assistance', methods=['POST'])
 def voice_assistance_route():
     if 'file' not in request.files:
@@ -99,10 +95,8 @@ def voice_assistance_route():
     if not wav_file.filename.lower().endswith('.wav'):
         return jsonify({"error": "Il file deve essere un WAV"}), 400
     # Chiamata alla funzione di assistenza vocale
-    result = voice_assistance(wav_file)
+    result = process_wav_file(wav_file)
     return jsonify(result)
-
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

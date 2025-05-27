@@ -1,0 +1,9 @@
+The Microcontroller of the board is STM32F767ZIT6 (ARM Cortex-M7).
+
+The debugger of the board ST-LINK/V2-1 (embedded, on-board).
+
+The pins used for UART are PD8 for transmit and PD9 for receive.
+
+The pins used for SPI are PA5 for SCK (clock), PA6 for MISO (data in), and PA7 for MOSI (data out).
+
+
