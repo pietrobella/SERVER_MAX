@@ -7,9 +7,9 @@ from PyPDF2 import PdfReader
 
 app = Flask(__name__)
 
-llm_api_key = os.getenv('GEMINI_API_KEY', "AIzaSyCk6uHZC42lQlENdmPIyP6n8MV66RFh3Qo")
+llm_api_key = "AIzaSyCk6uHZC42lQlENdmPIyP6n8MV66RFh3Qo"
 llm_model = "gemini-1.5-flash"
-genai.configure(llm_api_key)
+genai.configure(api_key=llm_api_key)
 
 
 def load_pdf_content():    
@@ -54,22 +54,26 @@ def process_wav_file(wav_file):
     Process the WAV file and extract text.
     """
     try:
-        ## Process the WAV file directly without going through voice assistant
         recognizer = sr.Recognizer()
         with sr.AudioFile(wav_file) as source:
             print(f"Processing WAV audio from: {wav_file}")
             audio = recognizer.record(source)
-            
+        
         # Recognize the speech
         extracted_text = recognizer.recognize_google(audio)
         print(f"Recognized from WAV: {extracted_text}")
         
         response = process_query(extracted_text)
         
-        return response
+        # Ensure response is a dictionary
+        if isinstance(response, dict):
+            return response
+        else:
+            return {"error": "Unexpected response format from process_query."}
     
     except Exception as e:
-        return None, str(e)
+        return {"error": str(e)}  # Return error as a JSON serializable dict
+
 
 # Function to process the query and generate a response
 def process_query(query):
@@ -110,9 +114,9 @@ def process_query(query):
     # Generate response
     genai_response = model.generate_content(prompt)
     response = genai_response.text
-
+    print(f"Generated response: {response}")
     json_response = extract_structured_response(query, response)
-    
+    print(f"Generated json response: {json_response}")
     return json_response
 
 # Function to extract structured data from the query and response
@@ -189,5 +193,5 @@ def extract_structured_response(query, response):
         "response": response,
         "components": components_data.get("components", [])
     }
-    
-    return jsonify(structured_data)
+    print(f"Structured data extracted: {structured_data}")
+    return structured_data
