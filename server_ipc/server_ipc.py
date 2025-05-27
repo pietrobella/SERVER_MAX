@@ -368,6 +368,7 @@ def get_component_details(component_id):
 
     return jsonify({
         "component_info": {
+            "name": component.name,
             "layer": component.layer,
             "rotation": component.rotation,
             "x": component.x,
