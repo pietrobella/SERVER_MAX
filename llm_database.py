@@ -90,10 +90,3 @@ def generate_component_list(source_db_path, board_id):
     session = Session()
     # Save to database
     save_texts_to_database(session, board_id, component_list_content)
-
-# Example usage
-if __name__ == "__main__":
-    source_db_path = "arboard.db"    # Your source database
-    board_id = 1  # Specify your board ID
-    generate_logical_net_text(source_db_path, board_id)
-    generate_component_list(source_db_path, board_id)

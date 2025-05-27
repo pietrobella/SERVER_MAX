@@ -4,6 +4,7 @@ from database_ipc import Session
 import os
 from werkzeug.utils import secure_filename
 from read_IPC import parse_ipc2581_and_populate_db
+import sys
 
 app = Flask(__name__)
 
@@ -1074,6 +1075,31 @@ def delete_user_manual(user_manual_id):
             return jsonify({"error": "User manual not found"}), 404
 
         return jsonify({"message": "User manual deleted successfully"})
+    except Exception as e:
+        g.session.rollback()
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/api/generate_llm_data/<int:board_id>', methods=['POST'])
+def generate_llm_data(board_id):
+    try:
+        sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+        from llm_database import generate_logical_net_text, generate_component_list
+        board = database_ipc.get_board(g.session, board_id)
+        if not board:
+            return jsonify({"error": f"Board with ID {board_id} not found"}), 404
+
+        generate_logical_net_text("arboard.db", board_id)
+        generate_component_list("arboard.db", board_id)
+
+        info_txts = database_ipc.get_info_txt_by_board(g.session, board_id)
+
+        return jsonify({
+            "message": "LLM data generated successfully",
+            "board_id": board_id,
+            "info_txt_count": len(info_txts),
+            "info_txt_ids": [info.id for info in info_txts]
+        }), 200
+
     except Exception as e:
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
