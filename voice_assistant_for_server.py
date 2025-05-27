@@ -11,9 +11,58 @@ llm_api_key = "AIzaSyCk6uHZC42lQlENdmPIyP6n8MV66RFh3Qo"
 llm_model = "gemini-1.5-flash"
 genai.configure(api_key=llm_api_key)
 
+import sqlite3
+from PyPDF2 import PdfReader
+import io
 
-def load_pdf_content():    
+def load_pdf_content_from_db(board_id):
+    """
+    Load PDF content from the database for a specific board ID.
+    """
     try:
+        # Connect to the SQLite database
+        conn = sqlite3.connect("arboard.db")
+        cursor = conn.cursor()
+
+        # Query to fetch the PDF file for the given board_id
+        cursor.execute("SELECT file_pdf FROM user_manual WHERE board_id = ?", (board_id,))
+        result = cursor.fetchone()
+
+        if not result:
+            print(f"No PDF found for board_id: {board_id}")
+            return "", ""
+
+        # The PDF file is stored as a BLOB in the database
+        pdf_blob = result[0]
+
+        # Convert the BLOB to a file-like object
+        pdf_file = io.BytesIO(pdf_blob)
+
+        # Use PyPDF2 to read the PDF content
+        reader = PdfReader(pdf_file)
+        content = []
+
+        total_pages = len(reader.pages)
+        for i, page in enumerate(reader.pages):
+            text = page.extract_text()
+            if text.strip():
+                content.append(f"Page {i+1}: {text}")
+
+        pdf_content = "\n\n".join(content)
+
+        # Close the database connection
+        conn.close()
+
+        return pdf_content, ""
+
+    except Exception as e:
+        print(f"Error loading PDF content from database: {e}")
+        return "", ""
+ 
+
+def load_text_files():    
+    try:
+        '''
         # Load PDF content
         # pdf_path = os.path.join("Loading", "llm_source_files", "board_manual.pdf")
         pdf_path = os.path.join("info_llm", "um1974-stm32-nucleo144-boards-mb1137-stmicroelectronics.pdf")
@@ -28,6 +77,7 @@ def load_pdf_content():
         
         pdf_content = "\n\n".join(content)
 
+        '''
         # Load all text files from the specified directory
         other_files_content = ""
         other_files_path = "info_llm"
@@ -42,7 +92,7 @@ def load_pdf_content():
         except Exception as e:
             print(f"Error reading text files: {e}")
         
-        return pdf_content, other_files_content
+        return other_files_content
     
     except Exception as e:
         print(f"Error loading PDF content: {e}")
@@ -82,7 +132,7 @@ def process_query(query):
     """
     # Set up the Gemini model
     model = genai.GenerativeModel(llm_model)
-    pdf_content, other_files_content = load_pdf_content()
+    pdf_content, other_files_content = load_text_files()
     
     prompt = f"""
     You are a specialized electronic engineering assistant that helps users with questions about microcontroller-based boards.
@@ -126,7 +176,7 @@ def extract_structured_response(query, response):
     """
     # Set up the Gemini model for structured extraction
     model = genai.GenerativeModel(llm_model)
-    pdf_content, other_files_content = load_pdf_content()
+    pdf_content, other_files_content = load_text_files()
     
     # Create a structured extraction prompt
     prompt = f"""

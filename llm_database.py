@@ -1,7 +1,9 @@
 import sqlite3
 import os
 
-def generate_logical_net_text(source_db_path, output_file, board_name=None):
+
+
+def generate_logical_net_text(source_db_path, output_file, board_id):
     """
     Generate a text file with logical net connection descriptions
     directly from the source database without an intermediate table,
@@ -11,27 +13,19 @@ def generate_logical_net_text(source_db_path, output_file, board_name=None):
     cursor = conn.cursor()
     
     # If board_name is provided, get the board_id first
-    board_id = None
-    if board_name:
-        cursor.execute("SELECT id FROM board WHERE name = ?", (board_name,))
-        result = cursor.fetchone()
-        if not result:
-            print(f"Board '{board_name}' not found!")
-            conn.close()
-            return False
-        board_id = result[0]
-        
+    if board_id:
         # Get all distinct logical nets for this board
         cursor.execute("SELECT DISTINCT ln.name FROM logical_net ln WHERE ln.board_id = ?", (board_id,))
     else:
         # Get all distinct logical nets
         cursor.execute("SELECT DISTINCT ln.name FROM logical_net ln")
     
+    
     logical_nets = cursor.fetchall()
     
     with open(output_file, 'w') as f:
-        if board_name:
-            f.write(f"Logical net connections for board: {board_name}\n")
+        #if board_name:
+        #    f.write(f"Logical net connections for board: {board_name}\n")
             
         for net_name_tuple in logical_nets:
             net_name = net_name_tuple[0]
@@ -64,14 +58,14 @@ def generate_logical_net_text(source_db_path, output_file, board_name=None):
     conn.close()
     return True
 
-def generate_component_list(source_db_path, output_file, board_name=None):
+def generate_component_list(source_db_path, output_file, board_id):
     """
     Generate a text file containing a list of all component names in the database,
     filtered by board name if provided
     """
     conn = sqlite3.connect(source_db_path)
     cursor = conn.cursor()
-    
+    '''
     # If board_name is provided, get the board_id first
     board_id = None
     if board_name:
@@ -82,7 +76,7 @@ def generate_component_list(source_db_path, output_file, board_name=None):
             conn.close()
             return False
         board_id = result[0]
-    
+    '''
     # Get all component names, filtered by board_id if provided
     query = "SELECT name, part FROM component"
     params = []
@@ -95,10 +89,10 @@ def generate_component_list(source_db_path, output_file, board_name=None):
     components = cursor.fetchall()
     
     with open(output_file, 'w') as f:
-        if board_name:
-            f.write(f"List of components for board: {board_name}\n")
-        else:
-            f.write("List of components in the database:\n")
+        #if board_name:
+        #    f.write(f"List of components for board: {board_name}\n")
+        #else:
+        #    f.write("List of components in the database:\n")
         
         for i, comp in enumerate(components, 1):
             component_name = comp[0]
@@ -129,14 +123,15 @@ def list_available_boards(source_db_path):
 # Example usage
 if __name__ == "__main__":
     source_db_path = "arboard.db"    # Your source database
-    net_output_file = "logical_net_connections.txt"
-    component_output_file = "component_list.txt"
+    net_output_file = os.path.join("info_llm", "logical_net_connections.txt")
+    component_output_file = os.path.join("info_llm", "component_list.txt")
     
     # List available boards
     available_boards = list_available_boards(source_db_path)
     
     # Choose a specific board or leave as None for all boards
-    selected_board = "MB1136"  # Change this to the board name you want, or None for all boards
-    
-    generate_logical_net_text(source_db_path, net_output_file, selected_board)
-    generate_component_list(source_db_path, component_output_file, selected_board)
+    #selected_board = "MB1136"  # Change this to the board name you want, or None for all boards
+    #selected_board = "test-3_r2"
+    board_id = 1
+    generate_logical_net_text(source_db_path, net_output_file, board_id)
+    generate_component_list(source_db_path, component_output_file, board_id)
