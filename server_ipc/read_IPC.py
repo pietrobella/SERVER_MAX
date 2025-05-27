@@ -326,7 +326,7 @@ def parse_ipc2581_and_populate_db(file_path, session=None):
             session.commit()
             session.close()
 
-        return result
+        return result, board_id
 
     except Exception as e:
         # Rollback in case of error

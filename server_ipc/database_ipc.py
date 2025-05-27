@@ -74,6 +74,31 @@ class NetPin(Base):
     component = relationship("Component", back_populates="net_connections")
     logical_net = relationship("LogicalNet", back_populates="pin_connections")
 
+class InfoTxt(Base):
+    __tablename__ = 'info_txt'
+    id = Column(Integer, primary_key=True)
+    board_id = Column(Integer, ForeignKey('board.id'))
+    file_txt = Column(LargeBinary)
+    
+    board = relationship("Board")
+
+class CropSchematic(Base):
+    __tablename__ = 'crop_schematic'
+    id = Column(Integer, primary_key=True)
+    board_id = Column(Integer, ForeignKey('board.id'))
+    file_png = Column(LargeBinary)
+    
+    board = relationship("Board")
+
+class UserManual(Base):
+    __tablename__ = 'user_manual'
+    id = Column(Integer, primary_key=True)
+    board_id = Column(Integer, ForeignKey('board.id'))
+    file_pdf = Column(LargeBinary)
+    
+    board = relationship("Board")
+
+
 # Database init
 def init_db():
     Base.metadata.create_all(engine)
@@ -439,3 +464,114 @@ def get_net_by_component_and_pin(session, component_name, pin_name, board_id=Non
             return None
     except ValueError as e:
         raise e
+    
+
+
+# To fix the position of this function 
+
+
+
+def create_info_txt(session, board_id, file_txt):
+    info_txt = InfoTxt(board_id=board_id, file_txt=file_txt)
+    session.add(info_txt)
+    session.commit()
+    return info_txt
+
+def create_crop_schematic(session, board_id, file_png):
+    crop_schematic = CropSchematic(board_id=board_id, file_png=file_png)
+    session.add(crop_schematic)
+    session.commit()
+    return crop_schematic
+
+def create_user_manual(session, board_id, file_pdf):
+    user_manual = UserManual(board_id=board_id, file_pdf=file_pdf)
+    session.add(user_manual)
+    session.commit()
+    return user_manual
+
+# READ operations per le nuove classi
+def get_info_txt(session, info_txt_id):
+    return session.query(InfoTxt).filter_by(id=info_txt_id).first()
+
+def get_info_txt_by_board(session, board_id):
+    return session.query(InfoTxt).filter_by(board_id=board_id).all()
+
+def get_crop_schematic(session, crop_schematic_id):
+    return session.query(CropSchematic).filter_by(id=crop_schematic_id).first()
+
+def get_crop_schematic_by_board(session, board_id):
+    return session.query(CropSchematic).filter_by(board_id=board_id).all()
+
+def get_user_manual(session, user_manual_id):
+    return session.query(UserManual).filter_by(id=user_manual_id).first()
+
+def get_user_manual_by_board(session, board_id):
+    return session.query(UserManual).filter_by(board_id=board_id).all()
+
+# UPDATE operations per le nuove classi
+def update_info_txt(session, info_txt_id, board_id=None, file_txt=None):
+    info_txt = session.query(InfoTxt).filter_by(id=info_txt_id).first()
+    if not info_txt:
+        return False
+
+    if board_id is not None:
+        info_txt.board_id = board_id
+    if file_txt is not None:
+        info_txt.file_txt = file_txt
+
+    session.commit()
+    return True
+
+def update_crop_schematic(session, crop_schematic_id, board_id=None, file_png=None):
+    crop_schematic = session.query(CropSchematic).filter_by(id=crop_schematic_id).first()
+    if not crop_schematic:
+        return False
+
+    if board_id is not None:
+        crop_schematic.board_id = board_id
+    if file_png is not None:
+        crop_schematic.file_png = file_png
+
+    session.commit()
+    return True
+
+def update_user_manual(session, user_manual_id, board_id=None, file_pdf=None):
+    user_manual = session.query(UserManual).filter_by(id=user_manual_id).first()
+    if not user_manual:
+        return False
+
+    if board_id is not None:
+        user_manual.board_id = board_id
+    if file_pdf is not None:
+        user_manual.file_pdf = file_pdf
+
+    session.commit()
+    return True
+
+# DELETE operations per le nuove classi
+def delete_info_txt(session, info_txt_id):
+    info_txt = session.query(InfoTxt).filter_by(id=info_txt_id).first()
+    if not info_txt:
+        return False
+
+    session.delete(info_txt)
+    session.commit()
+    return True
+
+def delete_crop_schematic(session, crop_schematic_id):
+    crop_schematic = session.query(CropSchematic).filter_by(id=crop_schematic_id).first()
+    if not crop_schematic:
+        return False
+
+    session.delete(crop_schematic)
+    session.commit()
+    return True
+
+def delete_user_manual(session, user_manual_id):
+    user_manual = session.query(UserManual).filter_by(id=user_manual_id).first()
+    if not user_manual:
+        return False
+
+    session.delete(user_manual)
+    session.commit()
+    return True
