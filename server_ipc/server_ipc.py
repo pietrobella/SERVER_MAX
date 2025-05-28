@@ -1082,14 +1082,13 @@ def delete_user_manual(user_manual_id):
 @app.route('/api/generate_llm_data/<int:board_id>', methods=['POST'])
 def generate_llm_data(board_id):
     try:
-        sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-        from llm_database import generate_logical_net_text, generate_component_list
+        
         board = database_ipc.get_board(g.session, board_id)
         if not board:
             return jsonify({"error": f"Board with ID {board_id} not found"}), 404
 
-        generate_logical_net_text("arboard.db", board_id)
-        generate_component_list("arboard.db", board_id)
+        database_ipc.generate_logical_net_text("arboard.db", board_id)
+        database_ipc.generate_component_list("arboard.db", board_id)
 
         info_txts = database_ipc.get_info_txt_by_board(g.session, board_id)
 
