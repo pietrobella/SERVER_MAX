@@ -30,7 +30,7 @@ def load_pdf_content_from_db(board_id):
 
         if not result:
             print(f"No PDF found for board_id: {board_id}")
-            return "", ""
+            return ""
 
         # The PDF file is stored as a BLOB in the database
         pdf_blob = result[0]
@@ -53,12 +53,55 @@ def load_pdf_content_from_db(board_id):
         # Close the database connection
         conn.close()
 
-        return pdf_content, ""
+        return pdf_content
 
     except Exception as e:
         print(f"Error loading PDF content from database: {e}")
-        return "", ""
- 
+        return ""
+
+def load_text_files_content_from_db(board_id):
+    """
+    Load PDF content from the database for a specific board ID.
+    """
+    try:
+        # Connect to the SQLite database
+        conn = sqlite3.connect("arboard.db")
+        cursor = conn.cursor()
+
+        # Query to fetch the PDF file for the given board_id
+        cursor.execute("SELECT file_txt FROM info_txt WHERE board_id = ?", (board_id,))
+        result = cursor.fetchone()
+
+        if not result:
+            print(f"No PDF found for board_id: {board_id}")
+            return ""
+
+        # The PDF file is stored as a BLOB in the database
+        pdf_blob = result[0]
+
+        # Convert the BLOB to a file-like object
+        pdf_file = io.BytesIO(pdf_blob)
+
+        # Use PyPDF2 to read the PDF content
+        reader = PdfReader(pdf_file)
+        content = []
+
+        total_pages = len(reader.pages)
+        for i, page in enumerate(reader.pages):
+            text = page.extract_text()
+            if text.strip():
+                content.append(f"Page {i+1}: {text}")
+
+        pdf_content = "\n\n".join(content)
+
+        # Close the database connection
+        conn.close()
+
+        return pdf_content
+
+    except Exception as e:
+        print(f"Error loading PDF content from database: {e}")
+        return ""
 
 def load_text_files():    
     try:
@@ -96,7 +139,7 @@ def load_text_files():
     
     except Exception as e:
         print(f"Error loading PDF content: {e}")
-        return "", ""
+        return ""
 
 # Function to process the WAV file and extract text
 def process_wav_file(wav_file):
@@ -132,7 +175,8 @@ def process_query(query):
     """
     # Set up the Gemini model
     model = genai.GenerativeModel(llm_model)
-    pdf_content, other_files_content = load_text_files()
+    pdf_content = load_pdf_content_from_db(1)
+    other_files_content = load_text_files_content_from_db(1)
     
     prompt = f"""
     You are a specialized electronic engineering assistant that helps users with questions about microcontroller-based boards.
@@ -176,7 +220,8 @@ def extract_structured_response(query, response):
     """
     # Set up the Gemini model for structured extraction
     model = genai.GenerativeModel(llm_model)
-    pdf_content, other_files_content = load_text_files()
+    pdf_content = load_pdf_content_from_db(1)
+    other_files_content = load_text_files_content_from_db(1)
     
     # Create a structured extraction prompt
     prompt = f"""

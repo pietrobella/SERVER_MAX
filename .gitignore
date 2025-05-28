@@ -46,7 +46,6 @@ log/
 *.db
 
 # Custom project specific
-arboard.db
 crop.db
 
 # Jupyter Notebook
