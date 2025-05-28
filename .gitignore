@@ -43,7 +43,7 @@ log/
 
 # Database
 *.sqlite3
-*.db
+
 
 # Custom project specific
 crop.db
