@@ -24,7 +24,7 @@ def parse_ipc2581_and_populate_db(file_path, session=None):
         tree = ET.parse(file_path)
         root = tree.getroot()
 
-        # Create board
+        # Determine board name first
         step_ref_elem = root.find('.//ipc:StepRef', namespaces)
         board_name = None
 
@@ -41,6 +41,22 @@ def parse_ipc2581_and_populate_db(file_path, session=None):
                 board_name = "Unknown Board"
                 step_elem = None
                 logger.warning("StepRef non trovato nel file IPC-2581. Usando nome predefinito.")
+
+        # *** CONTROLLO DUPLICATI CON SESSIONE SEPARATA ***
+        check_session = Session()
+        try:
+            existing_board = check_session.query(database_ipc.Board).filter_by(name=board_name).first()
+            if existing_board:
+                error_msg = f"Board with name '{board_name}' already exists in the database"
+                logger.error(error_msg)
+                check_session.close()
+                if close_session:
+                    session.close()
+                raise Exception(error_msg)
+        finally:
+            check_session.close()
+
+        logger.info(f"Board name '{board_name}' is available, proceeding with creation...")
 
         # Extract board polygon data
         board_polygon = None
@@ -335,8 +351,10 @@ def parse_ipc2581_and_populate_db(file_path, session=None):
             session.rollback()
             session.close()
         raise e
-
-# Example usage
+    
 if __name__ == "__main__":
-    result = parse_ipc2581_and_populate_db("server_ipc/MB1136.cvg")
-    print(result)
+    try:
+        result = parse_ipc2581_and_populate_db("server_ipc/MB1136.cvg")
+        print(result) 
+    except Exception as e:
+        print(f"Errore: {e}") 

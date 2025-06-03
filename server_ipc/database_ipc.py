@@ -105,10 +105,9 @@ def init_db():
     Base.metadata.create_all(engine)
 
 # CREATE operations
-def create_board(session, name, polygon=None):
+def create_board(session, name, polygon):
     board = Board(name=name, polygon=polygon)
     session.add(board)
-    session.commit()
     return board
 
 def create_package(session, name, height=None, polygon=None):
