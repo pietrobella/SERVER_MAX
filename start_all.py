@@ -3,14 +3,23 @@ import time
 import signal
 import os
 import platform
+sviluppo = True 
 
 IS_WINDOWS = platform.system() == "Windows"
 
-VENV_PYTHON = os.path.join(os.getcwd(), '.venv', 'Scripts', 'python.exe')
+if (sviluppo):
+    VENV_PYTHON = os.path.join(os.getcwd(), '.venv', 'Scripts', 'python.exe')
 
-IPC_SERVER_COMMAND = [VENV_PYTHON, 'server_ipc/server_ipc.py']
-CROP_SERVER_COMMAND = [VENV_PYTHON, 'server_crop/server_crop.py']
-GATEWAY_COMMAND = [VENV_PYTHON, 'gateway.py']
+    IPC_SERVER_COMMAND = [VENV_PYTHON, 'server_ipc/server_ipc.py']
+    CROP_SERVER_COMMAND = [VENV_PYTHON, 'server_crop/server_crop.py']
+    GATEWAY_COMMAND = [VENV_PYTHON, 'gateway.py']
+
+else:
+    PYTHON_EXEC = "python"
+
+    IPC_SERVER_COMMAND = [PYTHON_EXEC, 'server_ipc/server_ipc.py']
+    CROP_SERVER_COMMAND = [PYTHON_EXEC, 'server_crop/server_crop.py']
+    GATEWAY_COMMAND = [PYTHON_EXEC, 'gateway.py']
 
 def start_process(command):
     process = subprocess.Popen(command)
