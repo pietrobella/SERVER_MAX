@@ -3,12 +3,19 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 import sqlite3
 
+################################################################
 # Database setup
+################################################################
+
 Base = declarative_base()
 engine = create_engine('sqlite:///arboard.db')
 Session = sessionmaker(bind=engine)
 
+
+################################################################
 # Models defined
+################################################################
+
 class Board(Base):
     __tablename__ = 'board'
     id = Column(Integer, primary_key=True)
@@ -99,113 +106,26 @@ class UserManual(Base):
     
     board = relationship("Board")
 
-
 # Database init
 def init_db():
     Base.metadata.create_all(engine)
 
-# CREATE operations
+
+################################################################
+# CRUD for Board
+################################################################
+
+def get_all_boards(session):
+    return session.query(Board).all()
+
+def get_board(session, board_id):
+    return session.query(Board).filter_by(id=board_id).first()
+
 def create_board(session, name, polygon):
     board = Board(name=name, polygon=polygon)
     session.add(board)
     return board
 
-def create_package(session, name, height=None, polygon=None):
-    package = Package(name=name, height=height, polygon=polygon)
-    session.add(package)
-    session.commit()
-    return package
-
-def create_pin(session, name, package_id, x=None, y=None):
-    pin = Pin(name=name, x=x, y=y, package_id=package_id)
-    session.add(pin)
-    session.commit()
-    return pin
-
-def create_component(session, name, package_id, board_id, part=None, layer=None, rotation=None, x=None, y=None):
-    component = Component(
-        name=name,
-        package_id=package_id,
-        board_id=board_id,
-        part=part,
-        layer=layer,
-        rotation=rotation,
-        x=x,
-        y=y
-    )
-    session.add(component)
-    session.commit()
-    return component
-
-def create_logical_net(session, name, board_id):
-    logical_net = LogicalNet(name=name, board_id=board_id)
-    session.add(logical_net)
-    session.commit()
-    return logical_net
-
-def create_net_pin(session, component_id, pin_id, logical_net_id):
-    # Verifica se la connessione esiste già
-    existing = session.query(NetPin).filter_by(
-        pin_id=pin_id,
-        component_id=component_id
-    ).first()
-
-    if not existing:
-        # Solo se non esiste, crea una nuova connessione
-        net_pin = NetPin(pin_id=pin_id, component_id=component_id, logical_net_id=logical_net_id)
-        session.add(net_pin)
-        session.commit()
-        return net_pin
-    else:
-        print(f"Connection already exists: {existing.pin_id} -> {existing.component_id}")
-        
-        '''# Aggiorna la rete logica se necessario
-        if existing.logical_net_id != logical_net_id:
-            existing.logical_net_id = logical_net_id
-            session.commit()
-        return existing'''
-
-# READ operations
-def get_board(session, board_id):
-    return session.query(Board).filter_by(id=board_id).first()
-
-def get_all_boards(session):
-    return session.query(Board).all()
-
-def get_package(session, package_id):
-    return session.query(Package).filter_by(id=package_id).first()
-
-def get_all_packages(session):
-    return session.query(Package).all()
-
-def get_pin(session, pin_id):
-    return session.query(Pin).filter_by(id=pin_id).first()
-
-def get_pins_by_package(session, package_id):
-    return session.query(Pin).filter_by(package_id=package_id).all()
-
-def get_component(session, component_id):
-    return session.query(Component).filter_by(id=component_id).first()
-
-def get_components_by_board(session, board_id):
-    return session.query(Component).filter_by(board_id=board_id).all()
-
-def get_logical_net(session, logical_net_id):
-    return session.query(LogicalNet).filter_by(id=logical_net_id).first()
-
-def get_logical_nets_by_board(session, board_id):
-    return session.query(LogicalNet).filter_by(board_id=board_id).all()
-
-def get_net_pin(session, net_pin_id):
-    return session.query(NetPin).filter_by(id=net_pin_id).first()
-
-def get_net_pins_by_component(session, component_id):
-    return session.query(NetPin).filter_by(component_id=component_id).all()
-
-def get_net_pins_by_logical_net(session, logical_net_id):
-    return session.query(NetPin).filter_by(logical_net_id=logical_net_id).all()
-
-# UPDATE operations
 def update_board(session, board_id, name=None, polygon=None):
     board = session.query(Board).filter_by(id=board_id).first()
     if not board:
@@ -218,6 +138,94 @@ def update_board(session, board_id, name=None, polygon=None):
 
     session.commit()
     return True
+
+def delete_board(session, board_id):
+    
+    try:
+        board = session.query(Board).filter_by(id=board_id).first()
+        if not board:
+            return False, "Board not found"
+
+        components = session.query(Component).filter_by(board_id=board_id).count()
+        if components > 0:
+            return False, "Cannot delete board: there are components associated with it"
+
+        logical_nets = session.query(LogicalNet).filter_by(board_id=board_id).count()
+        if logical_nets > 0:
+            return False, "Cannot delete board: there are logical nets associated with it"
+
+        info_txts = session.query(InfoTxt).filter_by(board_id=board_id).count()
+        if info_txts > 0:
+            return False, "Cannot delete board: there are info texts associated with it"
+
+        crop_schematics = session.query(CropSchematic).filter_by(board_id=board_id).count()
+        if crop_schematics > 0:
+            return False, "Cannot delete board: there are crop schematics associated with it"
+
+        user_manuals = session.query(UserManual).filter_by(board_id=board_id).count()
+        if user_manuals > 0:
+            return False, "Cannot delete board: there are user manuals associated with it"
+
+        session.delete(board)
+        session.commit()
+        return True, f"Board {board_id} deleted successfully"
+
+    except Exception as e:
+        session.rollback()
+        return False, f"Error during delete: {str(e)}"
+
+def deep_delete_board(session, board_id):
+    try:
+        board = session.query(Board).filter_by(id=board_id).first()
+        if not board:
+            return False, "Board not found"
+
+        components = session.query(Component).filter_by(board_id=board_id).all()
+        component_ids = [comp.id for comp in components]
+        
+        if component_ids:
+            session.query(NetPin).filter(NetPin.component_id.in_(component_ids)).delete(synchronize_session=False)
+
+        logical_nets = session.query(LogicalNet).filter_by(board_id=board_id).all()
+        logical_net_ids = [net.id for net in logical_nets]
+        
+        if logical_net_ids:
+            session.query(NetPin).filter(NetPin.logical_net_id.in_(logical_net_ids)).delete(synchronize_session=False)
+
+        session.query(Component).filter_by(board_id=board_id).delete()
+
+        session.query(LogicalNet).filter_by(board_id=board_id).delete()
+
+        session.query(InfoTxt).filter_by(board_id=board_id).delete()
+        session.query(CropSchematic).filter_by(board_id=board_id).delete()
+        session.query(UserManual).filter_by(board_id=board_id).delete()
+
+        session.delete(board)
+
+        session.commit()
+        
+        return True, f"Board {board_id} and all related data deleted successfully"
+
+    except Exception as e:
+        session.rollback()
+        return False, f"Error during deep delete: {str(e)}"
+
+
+################################################################
+# CRUD for Package
+################################################################
+
+def get_all_packages(session):
+    return session.query(Package).all()
+
+def get_package(session, package_id):
+    return session.query(Package).filter_by(id=package_id).first()
+
+def create_package(session, name, height=None, polygon=None):
+    package = Package(name=name, height=height, polygon=polygon)
+    session.add(package)
+    session.commit()
+    return package
 
 def update_package(session, package_id, name=None, height=None, polygon=None):
     package = session.query(Package).filter_by(id=package_id).first()
@@ -233,6 +241,76 @@ def update_package(session, package_id, name=None, height=None, polygon=None):
 
     session.commit()
     return True
+
+def delete_package(session, package_id):
+    try:
+        package = session.query(Package).filter_by(id=package_id).first()
+        if not package:
+            return False, "Package not found"
+
+        pins = session.query(Pin).filter_by(package_id=package_id).count()
+        if pins > 0:
+            return False, "Cannot delete package: there are pins associated with it"
+
+        components = session.query(Component).filter_by(package_id=package_id).count()
+        if components > 0:
+            return False, "Cannot delete package: there are components associated with it"
+
+        session.delete(package)
+        session.commit()
+        return True, f"Package {package_id} deleted successfully"
+
+    except Exception as e:
+        session.rollback()
+        return False, f"Error during delete: {str(e)}"
+
+def deep_delete_package(session, package_id):
+    try:
+        package = session.query(Package).filter_by(id=package_id).first()
+        if not package:
+            return False, "Package not found"
+
+        pins = session.query(Pin).filter_by(package_id=package_id).all()
+        pin_ids = [pin.id for pin in pins]
+
+        components = session.query(Component).filter_by(package_id=package_id).all()
+        component_ids = [comp.id for comp in components]
+
+        if pin_ids:
+            session.query(NetPin).filter(NetPin.pin_id.in_(pin_ids)).delete(synchronize_session=False)
+
+        if component_ids:
+            session.query(NetPin).filter(NetPin.component_id.in_(component_ids)).delete(synchronize_session=False)
+
+        session.query(Component).filter_by(package_id=package_id).delete()
+
+        session.query(Pin).filter_by(package_id=package_id).delete()
+
+        session.delete(package)
+
+        session.commit()
+        return True, f"Package {package_id} and all related data deleted successfully"
+
+    except Exception as e:
+        session.rollback()
+        return False, f"Error during deep delete: {str(e)}"
+
+
+################################################################
+# CRUD for Pin
+################################################################
+
+def get_pin(session, pin_id):
+    return session.query(Pin).filter_by(id=pin_id).first()
+
+def get_pins_by_package(session, package_id):
+    return session.query(Pin).filter_by(package_id=package_id).all()
+
+def create_pin(session, name, package_id, x=None, y=None):
+    pin = Pin(name=name, x=x, y=y, package_id=package_id)
+    session.add(pin)
+    session.commit()
+    return pin
 
 def update_pin(session, pin_id, name=None, x=None, y=None, package_id=None):
     pin = session.query(Pin).filter_by(id=pin_id).first()
@@ -250,6 +328,66 @@ def update_pin(session, pin_id, name=None, x=None, y=None, package_id=None):
 
     session.commit()
     return True
+
+def delete_pin(session, pin_id):
+    try:
+        pin = session.query(Pin).filter_by(id=pin_id).first()
+        if not pin:
+            return False, "Pin not found"
+
+        net_connections = session.query(NetPin).filter_by(pin_id=pin_id).count()
+        if net_connections > 0:
+            return False, "Cannot delete pin: there are net connections associated with it"
+
+        session.delete(pin)
+        session.commit()
+        return True, "Pin deleted successfully"
+
+    except Exception as e:
+        session.rollback()
+        return False, f"Error during delete: {str(e)}"
+
+def deep_delete_pin(session, pin_id):
+    try:
+        pin = session.query(Pin).filter_by(id=pin_id).first()
+        if not pin:
+            return False, "Pin not found"
+
+        session.query(NetPin).filter_by(pin_id=pin_id).delete()
+
+        session.delete(pin)
+        session.commit()
+        return True, f"Pin {pin_id} and all related net connections deleted successfully"
+
+    except Exception as e:
+        session.rollback()
+        return False, f"Error during deep delete: {str(e)}"
+
+
+################################################################
+# CRUD for Component
+################################################################
+
+def get_component(session, component_id):
+    return session.query(Component).filter_by(id=component_id).first()
+
+def get_components_by_board(session, board_id):
+    return session.query(Component).filter_by(board_id=board_id).all()
+
+def create_component(session, name, package_id, board_id, part=None, layer=None, rotation=None, x=None, y=None):
+    component = Component(
+        name=name,
+        package_id=package_id,
+        board_id=board_id,
+        part=part,
+        layer=layer,
+        rotation=rotation,
+        x=x,
+        y=y
+    )
+    session.add(component)
+    session.commit()
+    return component
 
 def update_component(session, component_id, name=None, package_id=None, board_id=None,
                     part=None, layer=None, rotation=None, x=None, y=None):
@@ -277,6 +415,57 @@ def update_component(session, component_id, name=None, package_id=None, board_id
     session.commit()
     return True
 
+def delete_component(session, component_id):
+    try:
+        component = session.query(Component).filter_by(id=component_id).first()
+        if not component:
+            return False, "Component not found"
+
+        net_connections = session.query(NetPin).filter_by(component_id=component_id).count()
+        if net_connections > 0:
+            return False, "Cannot delete component: there are net connections associated with it"
+
+        session.delete(component)
+        session.commit()
+        return True, "Component deleted successfully"
+
+    except Exception as e:
+        session.rollback()
+        return False, str(e)
+
+def deep_delete_component(session, component_id):
+    try:
+        component = session.query(Component).filter_by(id=component_id).first()
+        if not component:
+            return False, "Component not found"
+
+        session.query(NetPin).filter_by(component_id=component_id).delete()
+
+        session.delete(component)
+        session.commit()
+        return True, "Component and all related data deleted successfully"
+
+    except Exception as e:
+        session.rollback()
+        return False, str(e)
+
+
+################################################################
+# CRUD for logical_net
+################################################################
+
+def get_logical_net(session, logical_net_id):
+    return session.query(LogicalNet).filter_by(id=logical_net_id).first()
+
+def get_logical_nets_by_board(session, board_id):
+    return session.query(LogicalNet).filter_by(board_id=board_id).all()
+
+def create_logical_net(session, name, board_id):
+    logical_net = LogicalNet(name=name, board_id=board_id)
+    session.add(logical_net)
+    session.commit()
+    return logical_net
+
 def update_logical_net(session, logical_net_id, name=None, board_id=None):
     logical_net = session.query(LogicalNet).filter_by(id=logical_net_id).first()
     if not logical_net:
@@ -289,6 +478,79 @@ def update_logical_net(session, logical_net_id, name=None, board_id=None):
 
     session.commit()
     return True
+
+def delete_logical_net(session, logical_net_id):
+    try:
+        logical_net = session.query(LogicalNet).filter_by(id=logical_net_id).first()
+        if not logical_net:
+            return False, "Logical net not found"
+
+        net_connections = session.query(NetPin).filter_by(logical_net_id=logical_net_id).count()
+        if net_connections > 0:
+            return False, "Cannot delete logical net: there are net connections associated with it"
+
+        session.delete(logical_net)
+        session.commit()
+        return True, "Logical net deleted successfully"
+
+    except Exception as e:
+        session.rollback()
+        return False, f"Error during delete: {str(e)}"
+
+def deep_delete_logical_net(session, logical_net_id):
+    try:
+        logical_net = session.query(LogicalNet).filter_by(id=logical_net_id).first()
+        if not logical_net:
+            return False, "Logical net not found"
+
+        session.query(NetPin).filter_by(logical_net_id=logical_net_id).delete()
+
+        session.delete(logical_net)
+        session.commit()
+        return True, f"Logical net {logical_net_id} and all related data deleted successfully"
+
+    except Exception as e:
+        session.rollback()
+        return False, f"Error during deep delete: {str(e)}"
+
+
+################################################################
+# CRUD for net_pin
+################################################################
+
+def get_net_pin(session, net_pin_id):
+    return session.query(NetPin).filter_by(id=net_pin_id).first()
+
+def get_net_pins_by_component(session, component_id):
+    return session.query(NetPin).filter_by(component_id=component_id).all()
+
+def get_net_pins_by_logical_net(session, logical_net_id):
+    return session.query(NetPin).filter_by(logical_net_id=logical_net_id).all()
+
+def get_net_pin_by_component_and_pin(session, component_id, pin_id):
+    return session.query(NetPin).filter_by(component_id=component_id, pin_id=pin_id).first()
+
+def create_net_pin(session, component_id, pin_id, logical_net_id):
+    
+    existing = session.query(NetPin).filter_by(
+        pin_id=pin_id,
+        component_id=component_id
+    ).first()
+
+    if not existing:
+        
+        net_pin = NetPin(pin_id=pin_id, component_id=component_id, logical_net_id=logical_net_id)
+        session.add(net_pin)
+        session.commit()
+        return net_pin
+    else:
+        print(f"Connection already exists: {existing.pin_id} -> {existing.component_id}")
+        
+        '''# Aggiornare la rete logica se necessario
+        if existing.logical_net_id != logical_net_id:
+            existing.logical_net_id = logical_net_id
+            session.commit()
+        return existing'''
 
 def update_net_pin(session, net_pin_id, pin_id=None, component_id=None, logical_net_id=None):
     net_pin = session.query(NetPin).filter_by(id=net_pin_id).first()
@@ -305,52 +567,6 @@ def update_net_pin(session, net_pin_id, pin_id=None, component_id=None, logical_
     session.commit()
     return True
 
-# DELETE operations
-def delete_board(session, board_id):
-    board = session.query(Board).filter_by(id=board_id).first()
-    if not board:
-        return False
-
-    session.delete(board)
-    session.commit()
-    return True
-
-def delete_package(session, package_id):
-    package = session.query(Package).filter_by(id=package_id).first()
-    if not package:
-        return False
-
-    session.delete(package)
-    session.commit()
-    return True
-
-def delete_pin(session, pin_id):
-    pin = session.query(Pin).filter_by(id=pin_id).first()
-    if not pin:
-        return False
-
-    session.delete(pin)
-    session.commit()
-    return True
-
-def delete_component(session, component_id):
-    component = session.query(Component).filter_by(id=component_id).first()
-    if not component:
-        return False
-
-    session.delete(component)
-    session.commit()
-    return True
-
-def delete_logical_net(session, logical_net_id):
-    logical_net = session.query(LogicalNet).filter_by(id=logical_net_id).first()
-    if not logical_net:
-        return False
-
-    session.delete(logical_net)
-    session.commit()
-    return True
-
 def delete_net_pin(session, net_pin_id):
     net_pin = session.query(NetPin).filter_by(id=net_pin_id).first()
     if not net_pin:
@@ -359,6 +575,11 @@ def delete_net_pin(session, net_pin_id):
     session.delete(net_pin)
     session.commit()
     return True
+
+
+################################################################
+# CRUD for general operations
+################################################################
 
 def clear_all_database(session):
     # Elimina prima le associazioni (tabelle di join)
@@ -374,102 +595,20 @@ def clear_all_database(session):
     session.commit()
     return True
 
-# Special functions
 
-def get_logical_net_by_name(session, net_name, board_id=None):
 
-    query = session.query(LogicalNet).filter(LogicalNet.name == net_name)
 
-    if board_id is not None:
-        query = query.filter(LogicalNet.board_id == board_id)
 
-    nets = query.all()
 
-    if not nets:
-        return None
-    elif len(nets) > 1:
-        raise ValueError(f"Multiple nets found with name '{net_name}'")
-    else:
-        return nets[0]
-    
-def get_pins_by_net_name(session, net_name, board_id=None):
-    try:
-        net = get_logical_net_by_name(session, net_name, board_id)
-        if not net:
-            return None
-        net_pins = session.query(NetPin).filter(NetPin.logical_net_id == net.id).all()
 
-        result = []
-        for net_pin in net_pins:
-            component = session.query(Component).filter(Component.id == net_pin.component_id).first()
-            pin = session.query(Pin).filter(Pin.id == net_pin.pin_id).first()
-            if component and pin:
-                result.append({
-                    "component_id": component.id,
-                    "component_name": component.name,
-                    "pin_id": pin.id,
-                    "pin_name": pin.name
-                })
-        return result
-    except ValueError as e:
-        raise e
-    
-def get_component_by_name(session, component_name, board_id=None):
-    query = session.query(Component).filter(Component.name == component_name)
-    if board_id is not None:
-        query = query.filter(Component.board_id == board_id)
-    components = query.all()
-    if not components:
-        return None
-    elif len(components) > 1:
-        raise ValueError(f"Multiple components found with name '{component_name}'")
-    else:
-        return components[0]
-    
-def get_pin_by_name_and_package(session, pin_name, package_id):
-    pins = session.query(Pin).filter(Pin.name == pin_name, Pin.package_id == package_id).all()
-    if not pins:
-        return None
-    elif len(pins) > 1:
-        raise ValueError(f"Multiple pins found with name '{pin_name}' in package {package_id}")
-    else:
-        return pins[0]
 
-def get_net_by_component_and_pin(session, component_name, pin_name, board_id=None):
-    try:
-        component = get_component_by_name(session, component_name, board_id)
-        if not component:
-            return None
-        package = session.query(Package).filter(Package.id == component.package_id).first()
-        if not package:
-            return None
-        pin = get_pin_by_name_and_package(session, pin_name, package.id)
-        if not pin:
-            return None
-        net_pin = session.query(NetPin).filter(
-            NetPin.component_id == component.id,
-            NetPin.pin_id == pin.id
-        ).first()
 
-        if not net_pin:
-            return None
-        logical_net = session.query(LogicalNet).filter(LogicalNet.id == net_pin.logical_net_id).first()
-        if logical_net:
-            return {
-                "net_id": logical_net.id,
-                "net_name": logical_net.name,
-                "board_id": logical_net.board_id
-            }
-        else:
-            return None
-    except ValueError as e:
-        raise e
-    
+
+
+
 
 
 # To fix the position of this function 
-
-
 
 def create_info_txt(session, board_id, file_txt):
     info_txt = InfoTxt(board_id=board_id, file_txt=file_txt)
