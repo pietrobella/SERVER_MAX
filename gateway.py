@@ -9,6 +9,7 @@ CORS(app)  # Abilita CORS per tutte le route
 # Configurazione dei server interni
 IPC_SERVER_URL = 'http://localhost:5001'
 CROP_SERVER_URL = 'http://localhost:5002'
+GEN_SERVER_URL = 'http://localhost:5003'
 
 # Funzione di routing generica
 def route_request(server_url, path):
@@ -63,6 +64,12 @@ def crop_route(path):
     content, status_code, headers = route_request(CROP_SERVER_URL, f'/api/{path}')
     return content, status_code, headers
 
+# Route per Gen
+@app.route('/gen/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+def gen_route(path):
+    content, status_code, headers = route_request(GEN_SERVER_URL, f'/api/{path}')
+    return content, status_code, headers
+
 # Pagina principale del gateway
 @app.route('/')
 def index():
@@ -70,7 +77,8 @@ def index():
         "message": "API Gateway",
         "endpoints": {
             "IPC API": "/ipc/...",
-            "Crop API": "/crop/..."
+            "Crop API": "/crop/...",
+            "Gen API": "/gen/..."
         }
     })
 
@@ -84,9 +92,7 @@ def not_found(e):
 def server_error(e):
     return jsonify({"error": "Internal server error"}), 500
 
-
-# Funzione di assistenza vocale (placeholder)
-
+# Funzione di assistenza vocale
 @app.route('/voice-assistance', methods=['POST'])
 def voice_assistance_route():
     if 'file' not in request.files:
