@@ -753,74 +753,21 @@ def delete_net_pin(net_pin_id):
 
 
 ################################################################
-# API for general operations
+# API for info_txt
 ################################################################
 
-@app.route('/api/clear-database', methods=['DELETE'])
-def clear_database():
-    try:
-        database_ipc.clear_all_database(g.session)
-        return jsonify({"message": "database cleared successfully"})
-    except Exception as e:
-        g.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-
-    file = request.files['file']
-
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        try:
-            stats, board_id = parse_ipc2581_and_populate_db(filepath, g.session)
-            return jsonify({
-                'message': 'File uploaded and processed successfully',
-                'board_id': board_id,
-                'stats': stats
-            }), 200
-        except Exception as e:
-            g.session.rollback()
-            return jsonify({'error': f'Error processing file: {str(e)}'}), 500
-
-    return jsonify({'error': 'File type not allowed'}), 400
-
-
-
-
-
-
-
-
-
-
-
-
-
-# API per InfoTxt
-@app.route('/api/info_txt', methods=['GET'])
-def get_info_txts():
-    board_id = request.args.get('board_id', type=int)
-
-    if board_id:
-        info_txts = database_ipc.get_info_txt_by_board(g.session, board_id)
-    else:
-        info_txts = g.session.query(database_ipc.InfoTxt).all()
-
+# return a list of all info_txts for a specific board (id, board_id)
+@app.route('/api/info_txts/<int:board_id>', methods=['GET'])
+def get_info_txts_by_board(board_id):
+    info_txts = database_ipc.get_info_txt_by_board(g.session, board_id)
     return jsonify([{
         "id": info.id,
         "board_id": info.board_id
     } for info in info_txts])
 
+# return a specific info_txt by id (id, board_id)
 @app.route('/api/info_txt/<int:info_txt_id>', methods=['GET'])
-def get_info_txt(info_txt_id):
+def get_info_txt_by_id(info_txt_id):
     info_txt = database_ipc.get_info_txt(g.session, info_txt_id)
     if not info_txt:
         return jsonify({"error": "Info text not found"}), 404
@@ -830,18 +777,7 @@ def get_info_txt(info_txt_id):
         "board_id": info_txt.board_id
     })
 
-@app.route('/api/info_txt/<int:info_txt_id>/file', methods=['GET'])
-def get_info_txt_file(info_txt_id):
-    info_txt = database_ipc.get_info_txt(g.session, info_txt_id)
-    if not info_txt or not info_txt.file_txt:
-        return jsonify({"error": "Info text file not found"}), 404
-
-    return app.response_class(
-        info_txt.file_txt,
-        mimetype='text/plain',
-        headers={"Content-Disposition": f"attachment;filename=info_{info_txt_id}.txt"}
-    )
-
+# create a new info_txt with file content and board_id
 @app.route('/api/info_txt', methods=['POST'])
 def create_info_txt():
     if 'file' not in request.files:
@@ -869,6 +805,7 @@ def create_info_txt():
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+# update an existing info_txt by id with optional file content and board_id
 @app.route('/api/info_txt/<int:info_txt_id>', methods=['PUT'])
 def update_info_txt(info_txt_id):
     board_id = request.form.get('board_id')
@@ -897,6 +834,7 @@ def update_info_txt(info_txt_id):
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+# delete an info_txt by id only if it has no dependencies
 @app.route('/api/info_txt/<int:info_txt_id>', methods=['DELETE'])
 def delete_info_txt(info_txt_id):
     try:
@@ -909,23 +847,23 @@ def delete_info_txt(info_txt_id):
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-# API per CropSchematic
-@app.route('/api/crop_schematic', methods=['GET'])
-def get_crop_schematics():
-    board_id = request.args.get('board_id', type=int)
 
-    if board_id:
-        crop_schematics = database_ipc.get_crop_schematic_by_board(g.session, board_id)
-    else:
-        crop_schematics = g.session.query(database_ipc.CropSchematic).all()
+################################################################
+# API for crop_schematic
+################################################################
 
+# return a list of all crop_schematics for a specific board (id, board_id)
+@app.route('/api/crop_schematics/<int:board_id>', methods=['GET'])
+def get_crop_schematics_by_board(board_id):
+    crop_schematics = database_ipc.get_crop_schematic_by_board(g.session, board_id)
     return jsonify([{
         "id": crop.id,
         "board_id": crop.board_id
     } for crop in crop_schematics])
 
+# return a specific crop_schematic by id (id, board_id)
 @app.route('/api/crop_schematic/<int:crop_schematic_id>', methods=['GET'])
-def get_crop_schematic(crop_schematic_id):
+def get_crop_schematic_by_id(crop_schematic_id):
     crop_schematic = database_ipc.get_crop_schematic(g.session, crop_schematic_id)
     if not crop_schematic:
         return jsonify({"error": "Crop schematic not found"}), 404
@@ -935,18 +873,7 @@ def get_crop_schematic(crop_schematic_id):
         "board_id": crop_schematic.board_id
     })
 
-@app.route('/api/crop_schematic/<int:crop_schematic_id>/file', methods=['GET'])
-def get_crop_schematic_file(crop_schematic_id):
-    crop_schematic = database_ipc.get_crop_schematic(g.session, crop_schematic_id)
-    if not crop_schematic or not crop_schematic.file_png:
-        return jsonify({"error": "Crop schematic file not found"}), 404
-
-    return app.response_class(
-        crop_schematic.file_png,
-        mimetype='image/png',
-        headers={"Content-Disposition": f"attachment;filename=schematic_{crop_schematic_id}.png"}
-    )
-
+# create a new crop_schematic with file content and board_id
 @app.route('/api/crop_schematic', methods=['POST'])
 def create_crop_schematic():
     if 'file' not in request.files:
@@ -974,6 +901,7 @@ def create_crop_schematic():
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+# update an existing crop_schematic by id with optional file content and board_id
 @app.route('/api/crop_schematic/<int:crop_schematic_id>', methods=['PUT'])
 def update_crop_schematic(crop_schematic_id):
     board_id = request.form.get('board_id')
@@ -1002,6 +930,7 @@ def update_crop_schematic(crop_schematic_id):
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+# delete a crop_schematic by id only if it has no dependencies
 @app.route('/api/crop_schematic/<int:crop_schematic_id>', methods=['DELETE'])
 def delete_crop_schematic(crop_schematic_id):
     try:
@@ -1014,23 +943,23 @@ def delete_crop_schematic(crop_schematic_id):
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-# API per UserManual
-@app.route('/api/user_manual', methods=['GET'])
-def get_user_manuals():
-    board_id = request.args.get('board_id', type=int)
 
-    if board_id:
-        user_manuals = database_ipc.get_user_manual_by_board(g.session, board_id)
-    else:
-        user_manuals = g.session.query(database_ipc.UserManual).all()
+################################################################
+# API for UserManual
+################################################################
 
+# return a list of all user manuals for a specific board (id, board_id)
+@app.route('/api/user_manuals/<int:board_id>', methods=['GET'])
+def get_user_manuals_by_board(board_id):
+    user_manuals = database_ipc.get_user_manual_by_board(g.session, board_id)
     return jsonify([{
         "id": manual.id,
         "board_id": manual.board_id
     } for manual in user_manuals])
 
+# return a specific user_manual by id (id, board_id)
 @app.route('/api/user_manual/<int:user_manual_id>', methods=['GET'])
-def get_user_manual(user_manual_id):
+def get_user_manual_by_id(user_manual_id):
     user_manual = database_ipc.get_user_manual(g.session, user_manual_id)
     if not user_manual:
         return jsonify({"error": "User manual not found"}), 404
@@ -1040,18 +969,7 @@ def get_user_manual(user_manual_id):
         "board_id": user_manual.board_id
     })
 
-@app.route('/api/user_manual/<int:user_manual_id>/file', methods=['GET'])
-def get_user_manual_file(user_manual_id):
-    user_manual = database_ipc.get_user_manual(g.session, user_manual_id)
-    if not user_manual or not user_manual.file_pdf:
-        return jsonify({"error": "User manual file not found"}), 404
-
-    return app.response_class(
-        user_manual.file_pdf,
-        mimetype='application/pdf',
-        headers={"Content-Disposition": f"attachment;filename=manual_{user_manual_id}.pdf"}
-    )
-
+# create a new user_manual with file content and board_id
 @app.route('/api/user_manual', methods=['POST'])
 def create_user_manual():
     if 'file' not in request.files:
@@ -1079,6 +997,7 @@ def create_user_manual():
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+# update an existing user_manual by id with optional file content and board_id
 @app.route('/api/user_manual/<int:user_manual_id>', methods=['PUT'])
 def update_user_manual(user_manual_id):
     board_id = request.form.get('board_id')
@@ -1107,6 +1026,7 @@ def update_user_manual(user_manual_id):
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+# delete a user_manual by id only if it has no dependencies
 @app.route('/api/user_manual/<int:user_manual_id>', methods=['DELETE'])
 def delete_user_manual(user_manual_id):
     try:
@@ -1119,6 +1039,12 @@ def delete_user_manual(user_manual_id):
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
     
+
+################################################################
+# API for LLM Data Generation
+################################################################
+
+# Generate LLM data for a specific board
 @app.route('/api/generate_llm_data/<int:board_id>', methods=['POST'])
 def generate_llm_data(board_id):
     try:
@@ -1142,7 +1068,56 @@ def generate_llm_data(board_id):
     except Exception as e:
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
-    
 
+
+################################################################
+# API for general operations
+################################################################
+
+# Clear the entire database
+@app.route('/api/clear-database', methods=['DELETE'])
+def clear_database():
+    try:
+        success = database_ipc.clear_all_database(g.session)
+        if success:
+            return jsonify({"message": "Database cleared successfully"})
+        else:
+            return jsonify({"error": "Failed to clear database"}), 500
+    except Exception as e:
+        g.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+# Upload IPC2581 file and parse it to populate the database
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(filepath)
+        try:
+            stats, board_id = parse_ipc2581_and_populate_db(filepath, g.session)
+            return jsonify({
+                'message': 'File uploaded and processed successfully',
+                'board_id': board_id,
+                'stats': stats
+            }), 200
+        except Exception as e:
+            g.session.rollback()
+            return jsonify({'error': f'Error processing file: {str(e)}'}), 500
+
+    return jsonify({'error': 'File type not allowed'}), 400
+
+################################################################
+
+
+# Run the Flask application for server IPC
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)

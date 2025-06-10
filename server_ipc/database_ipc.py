@@ -578,37 +578,14 @@ def delete_net_pin(session, net_pin_id):
 
 
 ################################################################
-# CRUD for general operations
+# CRUD for info_txt
 ################################################################
 
-def clear_all_database(session):
-    # Elimina prima le associazioni (tabelle di join)
-    session.query(NetPin).delete()
+def get_info_txt(session, info_txt_id):
+    return session.query(InfoTxt).filter_by(id=info_txt_id).first()
 
-    # Poi elimina le entità principali
-    session.query(Component).delete()
-    session.query(Pin).delete()
-    session.query(LogicalNet).delete()
-    session.query(Package).delete()
-    session.query(Board).delete()
-
-    session.commit()
-    return True
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# To fix the position of this function 
+def get_info_txt_by_board(session, board_id):
+    return session.query(InfoTxt).filter_by(board_id=board_id).all()
 
 def create_info_txt(session, board_id, file_txt):
     info_txt = InfoTxt(board_id=board_id, file_txt=file_txt)
@@ -616,38 +593,6 @@ def create_info_txt(session, board_id, file_txt):
     session.commit()
     return info_txt
 
-def create_crop_schematic(session, board_id, file_png):
-    crop_schematic = CropSchematic(board_id=board_id, file_png=file_png)
-    session.add(crop_schematic)
-    session.commit()
-    return crop_schematic
-
-def create_user_manual(session, board_id, file_pdf):
-    user_manual = UserManual(board_id=board_id, file_pdf=file_pdf)
-    session.add(user_manual)
-    session.commit()
-    return user_manual
-
-# READ operations per le nuove classi
-def get_info_txt(session, info_txt_id):
-    return session.query(InfoTxt).filter_by(id=info_txt_id).first()
-
-def get_info_txt_by_board(session, board_id):
-    return session.query(InfoTxt).filter_by(board_id=board_id).all()
-
-def get_crop_schematic(session, crop_schematic_id):
-    return session.query(CropSchematic).filter_by(id=crop_schematic_id).first()
-
-def get_crop_schematic_by_board(session, board_id):
-    return session.query(CropSchematic).filter_by(board_id=board_id).all()
-
-def get_user_manual(session, user_manual_id):
-    return session.query(UserManual).filter_by(id=user_manual_id).first()
-
-def get_user_manual_by_board(session, board_id):
-    return session.query(UserManual).filter_by(board_id=board_id).all()
-
-# UPDATE operations per le nuove classi
 def update_info_txt(session, info_txt_id, board_id=None, file_txt=None):
     info_txt = session.query(InfoTxt).filter_by(id=info_txt_id).first()
     if not info_txt:
@@ -660,6 +605,32 @@ def update_info_txt(session, info_txt_id, board_id=None, file_txt=None):
 
     session.commit()
     return True
+
+def delete_info_txt(session, info_txt_id):
+    info_txt = session.query(InfoTxt).filter_by(id=info_txt_id).first()
+    if not info_txt:
+        return False
+
+    session.delete(info_txt)
+    session.commit()
+    return True
+
+
+################################################################
+# CRUD for crop_schematic
+################################################################
+
+def get_crop_schematic(session, crop_schematic_id):
+    return session.query(CropSchematic).filter_by(id=crop_schematic_id).first()
+
+def get_crop_schematic_by_board(session, board_id):
+    return session.query(CropSchematic).filter_by(board_id=board_id).all()
+
+def create_crop_schematic(session, board_id, file_png):
+    crop_schematic = CropSchematic(board_id=board_id, file_png=file_png)
+    session.add(crop_schematic)
+    session.commit()
+    return crop_schematic
 
 def update_crop_schematic(session, crop_schematic_id, board_id=None, file_png=None):
     crop_schematic = session.query(CropSchematic).filter_by(id=crop_schematic_id).first()
@@ -674,6 +645,32 @@ def update_crop_schematic(session, crop_schematic_id, board_id=None, file_png=No
     session.commit()
     return True
 
+def delete_crop_schematic(session, crop_schematic_id):
+    crop_schematic = session.query(CropSchematic).filter_by(id=crop_schematic_id).first()
+    if not crop_schematic:
+        return False
+
+    session.delete(crop_schematic)
+    session.commit()
+    return True
+
+
+################################################################
+# CRUD for UserManual
+################################################################
+
+def get_user_manual(session, user_manual_id):
+    return session.query(UserManual).filter_by(id=user_manual_id).first()
+
+def get_user_manual_by_board(session, board_id):
+    return session.query(UserManual).filter_by(board_id=board_id).all()
+
+def create_user_manual(session, board_id, file_pdf):
+    user_manual = UserManual(board_id=board_id, file_pdf=file_pdf)
+    session.add(user_manual)
+    session.commit()
+    return user_manual
+
 def update_user_manual(session, user_manual_id, board_id=None, file_pdf=None):
     user_manual = session.query(UserManual).filter_by(id=user_manual_id).first()
     if not user_manual:
@@ -687,25 +684,6 @@ def update_user_manual(session, user_manual_id, board_id=None, file_pdf=None):
     session.commit()
     return True
 
-# DELETE operations per le nuove classi
-def delete_info_txt(session, info_txt_id):
-    info_txt = session.query(InfoTxt).filter_by(id=info_txt_id).first()
-    if not info_txt:
-        return False
-
-    session.delete(info_txt)
-    session.commit()
-    return True
-
-def delete_crop_schematic(session, crop_schematic_id):
-    crop_schematic = session.query(CropSchematic).filter_by(id=crop_schematic_id).first()
-    if not crop_schematic:
-        return False
-
-    session.delete(crop_schematic)
-    session.commit()
-    return True
-
 def delete_user_manual(session, user_manual_id):
     user_manual = session.query(UserManual).filter_by(id=user_manual_id).first()
     if not user_manual:
@@ -715,7 +693,10 @@ def delete_user_manual(session, user_manual_id):
     session.commit()
     return True
 
-#LLM_database functions
+
+################################################################
+# CRUD for LLM Data Generation
+################################################################
 
 def save_texts_to_database(session, board_id, text_file_content):
     try:
@@ -806,3 +787,30 @@ def generate_component_list(source_db_path, board_id):
     session = Session()
     # Save to database
     save_texts_to_database(session, board_id, component_list_content)
+
+
+################################################################
+# CRUD for general operations
+################################################################
+
+def clear_all_database(session):
+    try:
+        session.query(NetPin).delete()
+        
+        session.query(Component).delete()
+        session.query(Pin).delete()
+        session.query(LogicalNet).delete()
+        
+        session.query(InfoTxt).delete()
+        session.query(CropSchematic).delete()
+        session.query(UserManual).delete()
+        
+        session.query(Package).delete()
+        session.query(Board).delete()
+        
+        session.commit()
+        return True
+        
+    except Exception as e:
+        session.rollback()
+        raise e
