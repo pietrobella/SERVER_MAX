@@ -2,6 +2,12 @@ from flask import Flask, request, jsonify, g
 import database_ipc
 from database_ipc import Session
 import os
+import logging
+
+if os.environ.get('FLASK_ENV') != 'development':
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+
 from werkzeug.utils import secure_filename
 from read_IPC import parse_ipc2581_and_populate_db
 import sys
@@ -1120,4 +1126,4 @@ def upload_file():
 
 # Run the Flask application for server IPC
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=False)

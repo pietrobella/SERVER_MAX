@@ -3,6 +3,12 @@ from flask import Flask, request, jsonify, g
 import database_gen
 from database_gen import Session
 import os
+import logging
+
+if os.environ.get('FLASK_ENV') != 'development':
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+
 
 app = Flask(__name__)
 
@@ -276,4 +282,4 @@ def health_check():
 
 # Run the Flask application for server Gen
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5003, debug=True)
+    app.run(host='0.0.0.0', port=5003, debug=False)

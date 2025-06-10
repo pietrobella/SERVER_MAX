@@ -2,6 +2,13 @@ import subprocess
 import time
 import signal
 import os
+import logging
+
+os.environ['FLASK_ENV'] = 'production'
+if os.environ.get('FLASK_ENV') != 'development':
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+
 import platform
 
 development = True
@@ -25,7 +32,7 @@ else:
     GATEWAY_COMMAND = [PYTHON_EXEC, 'gateway.py']
 
 def start_process(command):
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = subprocess.Popen(command)
     return process
 
 def stop_process(process):
@@ -64,6 +71,8 @@ if __name__ == '__main__':
     print("- IPC API: http://localhost:5000/ipc/...")
     print("- Crop API: http://localhost:5000/crop/...")
     print("- Gen API: http://localhost:5000/gen/...")
+    print("\nHTTP request logs will appear below:")
+    print("-" * 50)
 
     try:
         gateway_process.wait()

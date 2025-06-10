@@ -2,6 +2,12 @@ from flask import Flask, request, jsonify, render_template_string, send_file, g
 import io
 import database_crop
 from database_crop import Session
+import os
+import logging
+
+if os.environ.get('FLASK_ENV') != 'development':
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
 
 app = Flask(__name__)
 
@@ -462,4 +468,4 @@ def clear_database():
 
 # Avvio del server
 if __name__ == '__main__':
-    app.run(debug=True, port=5002)
+    app.run(host='0.0.0.0', port=5002, debug=False)
