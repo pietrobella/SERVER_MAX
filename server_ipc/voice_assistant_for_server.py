@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-import os
 import json
 import speech_recognition as sr
 import google.generativeai as genai
@@ -110,7 +109,7 @@ def load_text_files_content_from_db(board_id):
 
 
 # Function to process the WAV file and extract text
-def process_wav_file(wav_file, board_id=1):
+def process_wav_file(wav_file, board_id):
     """
     Process the WAV file and extract text.
     

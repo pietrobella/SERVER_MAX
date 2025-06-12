@@ -3,6 +3,7 @@ import database_ipc
 from database_ipc import Session
 import os
 import logging
+from voice_assistant_for_server import process_query, process_wav_file
 
 if os.environ.get('FLASK_ENV') != 'development':
     log = logging.getLogger('werkzeug')
@@ -1047,8 +1048,42 @@ def delete_user_manual(user_manual_id):
     
 
 ################################################################
-# API for LLM Data Generation
+# API for LLM 
 ################################################################
+
+# Voice Assistance Route
+@app.route('/api/voice-assistance/<int:board_id>', methods=['POST'])
+def voice_assistance_route(board_id):
+    if 'file' not in request.files:
+        return jsonify({"error": "No file sent"}), 400
+    wav_file = request.files['file']
+    if not wav_file.filename.lower().endswith('.wav'):
+        return jsonify({"error": "The file must be a WAV"}), 400
+    result = process_wav_file(wav_file, board_id)
+    return jsonify(result)
+
+# Text Assistance Route
+@app.route('/api/text-assistance/<int:board_id>', methods=['POST'])
+def text_assistance_route(board_id):
+    if not request.is_json:
+        return jsonify({"error": "Request must be JSON"}), 400
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+
+    text_content = data.get('text', '').strip()
+    if not text_content:
+        return jsonify({"error": "No text provided"}), 400
+
+    print(f"Processing text: {text_content}")
+
+    result = process_query(text_content, board_id)
+
+    if isinstance(result, dict):
+        return jsonify(result)
+    else:
+        return jsonify({"error": "Unexpected response format from process_query.", "query": text_content, "components": []})
 
 # Generate LLM data for a specific board
 @app.route('/api/generate_llm_data/<int:board_id>', methods=['POST'])
