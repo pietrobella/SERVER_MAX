@@ -426,6 +426,7 @@ def get_components_details_by_board(board_id):
             "component_info": {
                 "id": component.id,
                 "name": component.name,
+                "part": component.part,
                 "layer": component.layer,
                 "rotation": component.rotation,
                 "x": component.x,
@@ -461,6 +462,7 @@ def get_component_details(component_id):
     return jsonify({
         "component_info": {
             "name": component.name,
+            "part": component.part,
             "layer": component.layer,
             "rotation": component.rotation,
             "x": component.x,
