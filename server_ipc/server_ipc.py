@@ -1,3 +1,4 @@
+import base64
 from flask import Flask, request, jsonify, g
 import database_ipc
 from database_ipc import Session
@@ -403,7 +404,43 @@ def get_components_by_board(board_id):
         "part": component.part,
     } for component in components])
 
-# return return a specific component by id and include package and pin details
+# return a list of all components by board_id, include package and pin details
+@app.route('/api/components/<int:board_id>/details', methods=['GET'])
+def get_components_details_by_board(board_id):
+    components = database_ipc.get_components_by_board(g.session, board_id)
+    result = []
+
+    for component in components:
+        package = database_ipc.get_package(g.session, component.package_id)
+        if not package:
+            continue  # oppure puoi aggiungere un errore specifico per questo componente
+
+        pins = database_ipc.get_pins_by_package(g.session, package.id)
+        pins_info = [{
+            "name": pin.name,
+            "x": pin.x,
+            "y": pin.y
+        } for pin in pins]
+
+        result.append({
+            "component_info": {
+                "id": component.id,
+                "name": component.name,
+                "layer": component.layer,
+                "rotation": component.rotation,
+                "x": component.x,
+                "y": component.y
+            },
+            "package_info": {
+                "id": package.id,
+                "polygon": package.polygon,
+                "pins": pins_info
+            }
+        })
+
+    return jsonify(result)
+
+# return a specific component by id and include package and pin details
 @app.route('/api/component/<int:component_id>/details', methods=['GET'])
 def get_component_details(component_id):
     component = database_ipc.get_component(g.session, component_id)
@@ -772,16 +809,20 @@ def get_info_txts_by_board(board_id):
         "board_id": info.board_id
     } for info in info_txts])
 
-# return a specific info_txt by id (id, board_id)
+# return a specific info_txt by id (id, board_id, file_txt as base64)
 @app.route('/api/info_txt/<int:info_txt_id>', methods=['GET'])
 def get_info_txt_by_id(info_txt_id):
     info_txt = database_ipc.get_info_txt(g.session, info_txt_id)
     if not info_txt:
         return jsonify({"error": "Info text not found"}), 404
 
+    file_txt_b64 = None
+    if info_txt.file_txt:
+        file_txt_b64 = base64.b64encode(info_txt.file_txt).decode('utf-8')
+
     return jsonify({
-        "id": info_txt.id,
-        "board_id": info_txt.board_id
+        "board_id": info_txt.board_id,
+        "file_txt": file_txt_b64
     })
 
 # create a new info_txt with file content and board_id
@@ -841,7 +882,7 @@ def update_info_txt(info_txt_id):
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-# delete an info_txt by id only if it has no dependencies
+# delete an info_txt by id
 @app.route('/api/info_txt/<int:info_txt_id>', methods=['DELETE'])
 def delete_info_txt(info_txt_id):
     try:
@@ -868,16 +909,20 @@ def get_crop_schematics_by_board(board_id):
         "board_id": crop.board_id
     } for crop in crop_schematics])
 
-# return a specific crop_schematic by id (id, board_id)
+# return a specific crop_schematic by id (id, board_id, file_png as base64)
 @app.route('/api/crop_schematic/<int:crop_schematic_id>', methods=['GET'])
 def get_crop_schematic_by_id(crop_schematic_id):
     crop_schematic = database_ipc.get_crop_schematic(g.session, crop_schematic_id)
     if not crop_schematic:
         return jsonify({"error": "Crop schematic not found"}), 404
 
+    file_png_b64 = None
+    if crop_schematic.file_png:
+        file_png_b64 = base64.b64encode(crop_schematic.file_png).decode('utf-8')
+
     return jsonify({
-        "id": crop_schematic.id,
-        "board_id": crop_schematic.board_id
+        "board_id": crop_schematic.board_id,
+        "file_png": file_png_b64
     })
 
 # create a new crop_schematic with file content and board_id
@@ -937,7 +982,7 @@ def update_crop_schematic(crop_schematic_id):
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-# delete a crop_schematic by id only if it has no dependencies
+# delete a crop_schematic by id
 @app.route('/api/crop_schematic/<int:crop_schematic_id>', methods=['DELETE'])
 def delete_crop_schematic(crop_schematic_id):
     try:
@@ -964,16 +1009,20 @@ def get_user_manuals_by_board(board_id):
         "board_id": manual.board_id
     } for manual in user_manuals])
 
-# return a specific user_manual by id (id, board_id)
+# return a specific user_manual by id (id, board_id, file_pdf as base64)
 @app.route('/api/user_manual/<int:user_manual_id>', methods=['GET'])
 def get_user_manual_by_id(user_manual_id):
     user_manual = database_ipc.get_user_manual(g.session, user_manual_id)
     if not user_manual:
         return jsonify({"error": "User manual not found"}), 404
 
+    file_pdf_b64 = None
+    if user_manual.file_pdf:
+        file_pdf_b64 = base64.b64encode(user_manual.file_pdf).decode('utf-8')
+
     return jsonify({
-        "id": user_manual.id,
-        "board_id": user_manual.board_id
+        "board_id": user_manual.board_id,
+        "file_pdf": file_pdf_b64
     })
 
 # create a new user_manual with file content and board_id
@@ -1033,7 +1082,7 @@ def update_user_manual(user_manual_id):
         g.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-# delete a user_manual by id only if it has no dependencies
+# delete a user_manual by id
 @app.route('/api/user_manual/<int:user_manual_id>', methods=['DELETE'])
 def delete_user_manual(user_manual_id):
     try:
