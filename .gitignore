@@ -38,6 +38,7 @@ log/
 
 # Custom project specific
 crop.db
+gen_server.db
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -54,3 +55,7 @@ coverage.xml
 
 # Cartelle
 uploads/
+venv/
+
+#Programs
+scan_py_onlyname.py

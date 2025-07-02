@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
+from functools import wraps
 from server_ipc.voice_assistant_for_server import process_wav_file 
 
 app = Flask(__name__)
@@ -10,6 +11,25 @@ CORS(app)  # Abilita CORS per tutte le route
 IPC_SERVER_URL = 'http://localhost:5001'
 CROP_SERVER_URL = 'http://localhost:5002'
 GEN_SERVER_URL = 'http://localhost:5003'
+
+ALLOWED_MACS = {
+    "fc:d2:b6:ac:84:ae",
+    "8c:8d:28:32:d7:ff",
+}
+def require_mac(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+
+        mac = request.headers.get('X-Device-MAC')
+        
+        if not mac:
+            return jsonify({"error": "MAC address required"}), 401
+        
+        if mac not in ALLOWED_MACS:
+            return jsonify({"error": "MAC address not authorized"}), 403
+            
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Funzione di routing generica
 def route_request(server_url, path):
@@ -46,7 +66,6 @@ def route_request(server_url, path):
                 stream=True
             )
 
-        # Prepara la risposta mantenendo status code e headers
         return response.content, response.status_code, dict(response.headers)
 
     except requests.exceptions.RequestException as e:
@@ -54,18 +73,21 @@ def route_request(server_url, path):
 
 # Route per IPC
 @app.route('/ipc/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@require_mac
 def ipc_route(path):
     content, status_code, headers = route_request(IPC_SERVER_URL, f'/api/{path}')
     return content, status_code, headers
 
 # Route per Crop
 @app.route('/crop/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@require_mac
 def crop_route(path):
     content, status_code, headers = route_request(CROP_SERVER_URL, f'/api/{path}')
     return content, status_code, headers
 
 # Route per Gen
 @app.route('/gen/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@require_mac
 def gen_route(path):
     content, status_code, headers = route_request(GEN_SERVER_URL, f'/api/{path}')
     return content, status_code, headers

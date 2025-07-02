@@ -24,12 +24,10 @@ if (development):
     GATEWAY_COMMAND = [VENV_PYTHON, 'gateway.py']
 
 else:
-    PYTHON_EXEC = "python"
-
-    IPC_SERVER_COMMAND = [PYTHON_EXEC, 'server_ipc/server_ipc.py']
-    CROP_SERVER_COMMAND = [PYTHON_EXEC, 'server_crop/server_crop.py']
-    GEN_SERVER_COMMAND = [PYTHON_EXEC, 'server_gen/server_gen.py']
-    GATEWAY_COMMAND = [PYTHON_EXEC, 'gateway.py']
+    IPC_SERVER_COMMAND = ['./server_ipc']
+    CROP_SERVER_COMMAND = ['./server_crop']
+    GEN_SERVER_COMMAND = ['./server_gen']
+    GATEWAY_COMMAND = ['./gateway']
 
 def start_process(command):
     process = subprocess.Popen(command)
