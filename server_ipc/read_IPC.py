@@ -99,6 +99,35 @@ def parse_ipc2581_and_populate_db(file_path, session=None):
         board = database_ipc.create_board(session, board_name, board_polygon)
         board_id = board.id
 
+        # --- ESTRAI E SALVA I LAYER DA CADDATA ---
+        layers = {}  # nome_layer: id
+        layer_count = 0
+
+        cad_data_elem = root.find('.//ipc:CadData', namespaces)
+        if cad_data_elem is not None:
+            for idx, layer_elem in enumerate(cad_data_elem.findall('ipc:Layer', namespaces)):
+                layer_name = layer_elem.get('name')
+                layer_function = layer_elem.get('layerFunction', None)
+                side = layer_elem.get('side', None)
+                polarity = layer_elem.get('polarity', None)
+                stack_order = idx + 1  # Ordine di apparizione
+
+                # Crea il layer solo se non già presente
+                if layer_name not in layers:
+                    layer_obj = database_ipc.create_layer(
+                        session,
+                        layer_name,
+                        board_id,
+                        layer_function,
+                        stack_order,
+                        side,
+                        polarity
+                    )
+                    layers[layer_name] = layer_obj.id
+                    layer_count += 1
+
+        logger.info(f"Estratti {layer_count} layer da CadData")
+
         # Process packages
         packages = {}  # Store package_id by name for later reference
         package_count = 0
@@ -327,12 +356,131 @@ def parse_ipc2581_and_populate_db(file_path, session=None):
 
         logger.info(f"Collegate {padstack_net_pin_count} connessioni pin-net da PadStack")
 
+        # --- ESTRAI E SALVA LE GEOMETRIE DELLE NET DAI LAYERFEATURE ---
+        net_design_count = 0
+        
+        for layer_feature in root.findall('.//ipc:LayerFeature', namespaces):
+            layer_ref = layer_feature.get('layerRef')
+            # Trova l'id del layer corrispondente
+            layer_id = layers.get(layer_ref)
+            if not layer_id:
+                logger.warning(f"Layer '{layer_ref}' non trovato nei layer estratti, saltando...")
+                continue
+
+            # Per ogni net (Set) su questo layer
+            for set_elem in layer_feature.findall('.//ipc:Set', namespaces):
+                net_name = set_elem.get('net')
+                logical_net_id = nets.get(net_name)
+                if not logical_net_id:
+                    logger.warning(f"Net '{net_name}' non trovata nelle reti logiche, saltando...")
+                    continue
+
+                # Estrai tutte le features (es: Line, Arc, Polygon, ecc)
+                features = []
+                features_elem = set_elem.find('.//ipc:Features', namespaces)
+                if features_elem is not None:
+                    # Estrai UserSpecial elements
+                    for user_special in features_elem.findall('.//ipc:UserSpecial', namespaces):
+                        # Estrai Line elements
+                        for line_elem in user_special.findall('.//ipc:Line', namespaces):
+                            line_data = {
+                                "type": "Line",
+                                "startX": float(line_elem.get("startX", "0.0")),
+                                "startY": float(line_elem.get("startY", "0.0")),
+                                "endX": float(line_elem.get("endX", "0.0")),
+                                "endY": float(line_elem.get("endY", "0.0")),
+                            }
+                            # LineDesc properties
+                            line_desc = line_elem.find('.//ipc:LineDesc', namespaces)
+                            if line_desc is not None:
+                                line_data.update({
+                                    "lineEnd": line_desc.get("lineEnd"),
+                                    "lineWidth": float(line_desc.get("lineWidth", "0.0")),
+                                    "lineProperty": line_desc.get("lineProperty"),
+                                })
+                            features.append(line_data)
+
+                        # Estrai Arc elements
+                        for arc_elem in user_special.findall('.//ipc:Arc', namespaces):
+                            arc_data = {
+                                "type": "Arc",
+                                "startX": float(arc_elem.get("startX", "0.0")),
+                                "startY": float(arc_elem.get("startY", "0.0")),
+                                "endX": float(arc_elem.get("endX", "0.0")),
+                                "endY": float(arc_elem.get("endY", "0.0")),
+                                "centerX": float(arc_elem.get("centerX", "0.0")),
+                                "centerY": float(arc_elem.get("centerY", "0.0")),
+                                "clockwise": arc_elem.get("clockwise", "false").lower() == "true"
+                            }
+                            # ArcDesc properties
+                            arc_desc = arc_elem.find('.//ipc:ArcDesc', namespaces)
+                            if arc_desc is not None:
+                                arc_data.update({
+                                    "lineEnd": arc_desc.get("lineEnd"),
+                                    "lineWidth": float(arc_desc.get("lineWidth", "0.0")),
+                                    "lineProperty": arc_desc.get("lineProperty"),
+                                })
+                            features.append(arc_data)
+
+                        # Estrai Polygon elements
+                        for polygon_elem in user_special.findall('.//ipc:Polygon', namespaces):
+                            polygon_points = []
+                            for point_elem in polygon_elem:
+                                point_type = point_elem.tag.split('}')[-1]  # Remove namespace
+                                x = float(point_elem.get('x', '0.0'))
+                                y = float(point_elem.get('y', '0.0'))
+
+                                point_data = {
+                                    'type': point_type,
+                                    'x': x,
+                                    'y': y
+                                }
+
+                                # Add curve-specific attributes if present
+                                if point_type == 'PolyStepCurve':
+                                    center_x = float(point_elem.get('centerX', '0.0'))
+                                    center_y = float(point_elem.get('centerY', '0.0'))
+                                    clockwise = point_elem.get('clockwise', 'FALSE') == 'TRUE'
+                                    point_data.update({
+                                        'centerX': center_x,
+                                        'centerY': center_y,
+                                        'clockwise': clockwise
+                                    })
+
+                                polygon_points.append(point_data)
+
+                            polygon_data = {
+                                "type": "Polygon",
+                                "points": polygon_points
+                            }
+                            features.append(polygon_data)
+
+                        # Estrai Circle elements
+                        for circle_elem in user_special.findall('.//ipc:Circle', namespaces):
+                            circle_data = {
+                                "type": "Circle",
+                                "centerX": float(circle_elem.get("centerX", "0.0")),
+                                "centerY": float(circle_elem.get("centerY", "0.0")),
+                                "diameter": float(circle_elem.get("diameter", "0.0"))
+                            }
+                            features.append(circle_data)
+
+                # Se ci sono features da salvare, crea la NetDesign
+                if features:
+                    geometry_json = json.dumps(features)
+                    database_ipc.create_net_design(session, logical_net_id, layer_id, geometry_json)
+                    net_design_count += 1
+
+        logger.info(f"Estratte {net_design_count} geometrie di net dai LayerFeature")
+
         result = {
             "board_count": 1,
             "package_count": package_count,
             "component_count": component_count,
             "net_count": net_count,
-            "net_pin_count": net_pin_count + padstack_net_pin_count
+            "net_pin_count": net_pin_count + padstack_net_pin_count,
+            "layer_count": layer_count,
+            "net_design_count": net_design_count
         }
 
         logger.info(f"Parsing completato con successo: {result}")
@@ -354,7 +502,7 @@ def parse_ipc2581_and_populate_db(file_path, session=None):
     
 if __name__ == "__main__":
     try:
-        result = parse_ipc2581_and_populate_db("server_ipc/MB1136.cvg")
+        result = parse_ipc2581_and_populate_db("server_ipc/People_Counter_Project.cvg")
         print(result) 
     except Exception as e:
-        print(f"Errore: {e}") 
+        print(f"Errore: {e}")

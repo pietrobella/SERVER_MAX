@@ -799,6 +799,236 @@ def delete_net_pin(net_pin_id):
 
 
 ################################################################
+# API for Layer
+################################################################
+
+# return a list of all layers for a specific board (id, name, layer_type, stack_order)
+@app.route('/api/layers/<int:board_id>', methods=['GET'])
+def get_layers_by_board_api(board_id):
+    layers = database_ipc.get_layers_by_board(g.session, board_id)
+    return jsonify([{
+        "id": layer.id,
+        "name": layer.name,
+        "layer_type": layer.layer_type,
+        "stack_order": layer.stack_order
+    } for layer in layers])
+
+# return a specific layer by id (name, layer_type, stack_order, board_id)
+@app.route('/api/layer/<int:layer_id>', methods=['GET'])
+def get_layer_api(layer_id):
+    layer = database_ipc.get_layer(g.session, layer_id)
+    if not layer:
+        return jsonify({"error": "Layer not found"}), 404
+
+    return jsonify({
+        "name": layer.name,
+        "layer_type": layer.layer_type,
+        "stack_order": layer.stack_order,
+        "board_id": layer.board_id
+    })
+
+# return a specific layer by name and board_id
+@app.route('/api/boards/<int:board_id>/layers/<string:layer_name>', methods=['GET'])
+def get_layer_by_name_and_board_api(board_id, layer_name):
+    layer = database_ipc.get_layer_by_name_and_board(g.session, layer_name, board_id)
+    if not layer:
+        return jsonify({"error": "Layer not found"}), 404
+
+    return jsonify({
+        "id": layer.id,
+        "name": layer.name,
+        "layer_type": layer.layer_type,
+        "stack_order": layer.stack_order,
+        "board_id": layer.board_id
+    })
+
+# create a new layer with name, board_id, optional layer_type and stack_order
+@app.route('/api/layers', methods=['POST'])
+def create_layer_api():
+    data = request.json
+    if not data or 'name' not in data or 'board_id' not in data:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        layer = database_ipc.create_layer(
+            g.session,
+            data['name'],
+            data['board_id'],
+            data.get('layer_type'),
+            data.get('stack_order')
+        )
+        return jsonify({
+            "id": layer.id,
+            "name": layer.name,
+            "layer_type": layer.layer_type,
+            "stack_order": layer.stack_order,
+            "board_id": layer.board_id
+        }), 201
+    except Exception as e:
+        g.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+# update an existing layer by id with optional name, layer_type and stack_order
+@app.route('/api/layers/<int:layer_id>', methods=['PUT'])
+def update_layer_api(layer_id):
+    data = request.json
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    try:
+        success = database_ipc.update_layer(
+            g.session,
+            layer_id,
+            data.get('name'),
+            data.get('layer_type'),
+            data.get('stack_order')
+        )
+        if not success:
+            return jsonify({"error": "Layer not found"}), 404
+
+        layer = database_ipc.get_layer(g.session, layer_id)
+        return jsonify({
+            "id": layer.id,
+            "name": layer.name,
+            "layer_type": layer.layer_type,
+            "stack_order": layer.stack_order,
+            "board_id": layer.board_id
+        })
+    except Exception as e:
+        g.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+# delete a layer by id only if it has no dependencies
+@app.route('/api/layers/<int:layer_id>', methods=['DELETE'])
+def delete_layer_api(layer_id):
+    try:
+        success = database_ipc.delete_layer(g.session, layer_id)
+        if not success:
+            return jsonify({"error": "Layer not found"}), 404
+
+        return jsonify({"message": "Layer deleted successfully"})
+    except Exception as e:
+        g.session.rollback()
+        return jsonify({"error": str(e)}), 500
+    
+
+################################################################
+# API for NetDesign
+################################################################
+
+# return a list of all net designs for a specific logical net (id, layer_id, geometry_json)
+@app.route('/api/logical_nets/<int:logical_net_id>/net_designs', methods=['GET'])
+def get_net_designs_by_logical_net_api(logical_net_id):
+    net_designs = database_ipc.get_net_designs_by_logical_net(g.session, logical_net_id)
+    return jsonify([{
+        "id": design.id,
+        "layer_id": design.layer_id,
+        "layer_name": design.layer.name if design.layer else None,
+        "geometry_json": design.geometry_json
+    } for design in net_designs])
+
+# return a list of all net designs for a specific layer (id, logical_net_id, geometry_json)
+@app.route('/api/layers/<int:layer_id>/net_designs', methods=['GET'])
+def get_net_designs_by_layer_api(layer_id):
+    net_designs = database_ipc.get_net_designs_by_layer(g.session, layer_id)
+    return jsonify([{
+        "id": design.id,
+        "logical_net_id": design.logical_net_id,
+        "logical_net_name": design.logical_net.name if design.logical_net else None,
+        "geometry_json": design.geometry_json
+    } for design in net_designs])
+
+# return a specific net design by id (logical_net_id, layer_id, geometry_json)
+@app.route('/api/net_design/<int:net_design_id>', methods=['GET'])
+def get_net_design_api(net_design_id):
+    net_design = database_ipc.get_net_design(g.session, net_design_id)
+    if not net_design:
+        return jsonify({"error": "Net design not found"}), 404
+
+    return jsonify({
+        "logical_net_id": net_design.logical_net_id,
+        "logical_net_name": net_design.logical_net.name if net_design.logical_net else None,
+        "layer_id": net_design.layer_id,
+        "layer_name": net_design.layer.name if net_design.layer else None,
+        "geometry_json": net_design.geometry_json
+    })
+
+# return net designs for a specific logical net and layer
+@app.route('/api/logical_nets/<int:logical_net_id>/layers/<int:layer_id>/net_designs', methods=['GET'])
+def get_net_designs_by_logical_net_and_layer_api(logical_net_id, layer_id):
+    net_designs = database_ipc.get_net_designs_by_logical_net_and_layer(g.session, logical_net_id, layer_id)
+    return jsonify([{
+        "id": design.id,
+        "geometry_json": design.geometry_json
+    } for design in net_designs])
+
+# create a new net design with logical_net_id, layer_id and geometry_json
+@app.route('/api/net_designs', methods=['POST'])
+def create_net_design_api():
+    data = request.json
+    if not data or 'logical_net_id' not in data or 'layer_id' not in data or 'geometry_json' not in data:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        net_design = database_ipc.create_net_design(
+            g.session,
+            data['logical_net_id'],
+            data['layer_id'],
+            data['geometry_json']
+        )
+        return jsonify({
+            "id": net_design.id,
+            "logical_net_id": net_design.logical_net_id,
+            "layer_id": net_design.layer_id,
+            "geometry_json": net_design.geometry_json
+        }), 201
+    except Exception as e:
+        g.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+# update an existing net design by id with optional layer_id and geometry_json
+@app.route('/api/net_designs/<int:net_design_id>', methods=['PUT'])
+def update_net_design_api(net_design_id):
+    data = request.json
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    try:
+        success = database_ipc.update_net_design(
+            g.session,
+            net_design_id,
+            data.get('layer_id'),
+            data.get('geometry_json')
+        )
+        if not success:
+            return jsonify({"error": "Net design not found"}), 404
+
+        net_design = database_ipc.get_net_design(g.session, net_design_id)
+        return jsonify({
+            "id": net_design.id,
+            "logical_net_id": net_design.logical_net_id,
+            "layer_id": net_design.layer_id,
+            "geometry_json": net_design.geometry_json
+        })
+    except Exception as e:
+        g.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+# delete a net design by id
+@app.route('/api/net_designs/<int:net_design_id>', methods=['DELETE'])
+def delete_net_design_api(net_design_id):
+    try:
+        success = database_ipc.delete_net_design(g.session, net_design_id)
+        if not success:
+            return jsonify({"error": "Net design not found"}), 404
+
+        return jsonify({"message": "Net design deleted successfully"})
+    except Exception as e:
+        g.session.rollback()
+        return jsonify({"error": str(e)}), 500
+    
+
+################################################################
 # API for info_txt
 ################################################################
 

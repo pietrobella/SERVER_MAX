@@ -24,6 +24,7 @@ class Board(Base):
 
     components = relationship("Component", back_populates="board")
     logical_nets = relationship("LogicalNet", back_populates="board")
+    layers = relationship("Layer", back_populates="board")
 
 class Package(Base):
     __tablename__ = 'package'
@@ -70,6 +71,7 @@ class LogicalNet(Base):
 
     board = relationship("Board", back_populates="logical_nets")
     pin_connections = relationship("NetPin", back_populates="logical_net")
+    designs = relationship("NetDesign", back_populates="logical_net")
 
 class NetPin(Base):
     __tablename__ = 'net_pin'
@@ -81,6 +83,29 @@ class NetPin(Base):
     pin = relationship("Pin", back_populates="net_connections")
     component = relationship("Component", back_populates="net_connections")
     logical_net = relationship("LogicalNet", back_populates="pin_connections")
+
+class Layer(Base):
+    __tablename__ = 'layer'
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    layer_function = Column(String, nullable=True)  
+    side = Column(String, nullable=True)            
+    polarity = Column(String, nullable=True)        
+    stack_order = Column(Integer, nullable=True)   
+    board_id = Column(Integer, ForeignKey('board.id'), nullable=False)
+
+    board = relationship("Board", back_populates="layers")
+    net_designs = relationship("NetDesign", back_populates="layer")
+
+class NetDesign(Base):
+    __tablename__ = 'net_design'
+    id = Column(Integer, primary_key=True)
+    logical_net_id = Column(Integer, ForeignKey('logical_net.id'), nullable=False)
+    layer_id = Column(Integer, ForeignKey('layer.id'), nullable=False)
+    geometry_json = Column(Text, nullable=False) 
+
+    logical_net = relationship("LogicalNet", back_populates="designs")
+    layer = relationship("Layer", back_populates="net_designs")
 
 class InfoTxt(Base):
     __tablename__ = 'info_txt'
@@ -124,6 +149,7 @@ def get_board(session, board_id):
 def create_board(session, name, polygon):
     board = Board(name=name, polygon=polygon)
     session.add(board)
+    session.commit()
     return board
 
 def update_board(session, board_id, name=None, polygon=None):
@@ -573,6 +599,109 @@ def delete_net_pin(session, net_pin_id):
         return False
 
     session.delete(net_pin)
+    session.commit()
+    return True
+
+
+################################################################
+# CRUD for Layer
+################################################################
+
+def get_layer(session, layer_id):
+    return session.query(Layer).filter_by(id=layer_id).first()
+
+def get_layers_by_board(session, board_id):
+    return session.query(Layer).filter_by(board_id=board_id).order_by(Layer.stack_order).all()
+
+def get_layer_by_name_and_board(session, layer_name, board_id):
+    return session.query(Layer).filter_by(name=layer_name, board_id=board_id).first()
+
+def create_layer(session, name, board_id, layer_function=None, stack_order=None, side=None, polarity=None):
+    layer = Layer(
+        name=name,
+        board_id=board_id,
+        layer_function=layer_function,
+        stack_order=stack_order,
+        side=side,
+        polarity=polarity
+    )
+    session.add(layer)
+    session.commit()
+    return layer
+
+def update_layer(session, layer_id, name=None, layer_type=None, stack_order=None):
+    layer = session.query(Layer).filter_by(id=layer_id).first()
+    if not layer:
+        return False
+
+    if name is not None:
+        layer.name = name
+    if layer_type is not None:
+        layer.layer_type = layer_type
+    if stack_order is not None:
+        layer.stack_order = stack_order
+
+    session.commit()
+    return True
+
+def delete_layer(session, layer_id):
+    layer = session.query(Layer).filter_by(id=layer_id).first()
+    if not layer:
+        return False
+
+    session.delete(layer)
+    session.commit()
+    return True
+
+
+################################################################
+# CRUD for NetDesign
+################################################################
+
+def get_net_design(session, net_design_id):
+    return session.query(NetDesign).filter_by(id=net_design_id).first()
+
+def get_net_designs_by_logical_net(session, logical_net_id):
+    return session.query(NetDesign).filter_by(logical_net_id=logical_net_id).all()
+
+def get_net_designs_by_layer(session, layer_id):
+    return session.query(NetDesign).filter_by(layer_id=layer_id).all()
+
+def get_net_designs_by_logical_net_and_layer(session, logical_net_id, layer_id):
+    return session.query(NetDesign).filter_by(
+        logical_net_id=logical_net_id, 
+        layer_id=layer_id
+    ).all()
+
+def create_net_design(session, logical_net_id, layer_id, geometry_json):
+    net_design = NetDesign(
+        logical_net_id=logical_net_id,
+        layer_id=layer_id,
+        geometry_json=geometry_json
+    )
+    session.add(net_design)
+    session.commit()
+    return net_design
+
+def update_net_design(session, net_design_id, layer_id=None, geometry_json=None):
+    net_design = session.query(NetDesign).filter_by(id=net_design_id).first()
+    if not net_design:
+        return False
+
+    if layer_id is not None:
+        net_design.layer_id = layer_id
+    if geometry_json is not None:
+        net_design.geometry_json = geometry_json
+
+    session.commit()
+    return True
+
+def delete_net_design(session, net_design_id):
+    net_design = session.query(NetDesign).filter_by(id=net_design_id).first()
+    if not net_design:
+        return False
+
+    session.delete(net_design)
     session.commit()
     return True
 
