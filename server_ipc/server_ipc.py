@@ -413,7 +413,7 @@ def get_components_details_by_board(board_id):
     for component in components:
         package = database_ipc.get_package(g.session, component.package_id)
         if not package:
-            continue  # oppure puoi aggiungere un errore specifico per questo componente
+            continue  
 
         pins = database_ipc.get_pins_by_package(g.session, package.id)
         pins_info = [{
@@ -435,7 +435,8 @@ def get_components_details_by_board(board_id):
             "package_info": {
                 "id": package.id,
                 "polygon": package.polygon,
-                "pins": pins_info
+                "pins": pins_info,
+                "height": package.height
             }
         })
 
@@ -469,8 +470,10 @@ def get_component_details(component_id):
             "y": component.y
         },
         "package_info": {
+            "id": package.id,
             "polygon": package.polygon,
-            "pins": pins_info
+            "pins": pins_info,
+            "height": package.height
         }
     })
 
