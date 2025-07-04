@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+import os
 import json
 import speech_recognition as sr
 import google.generativeai as genai
@@ -109,26 +110,23 @@ def load_text_files_content_from_db(board_id):
 
 
 # Function to process the WAV file and extract text
-def process_wav_file(wav_file, board_id):
+def process_wav_file(wav_file, board_id=1):
     """
-    Process the WAV file and extract text using Whisper, with fallback to Google Speech Recognition.
+    Process the WAV file and extract text.
     
     Args:
         wav_file (str): Path to the WAV file
-        board_id (int): The board ID to query.
+        board_id (int, optional): The board ID to query. Defaults to 1.
     """
-    # Try Whisper first
     try:
-        import whisper
-        model = whisper.load_model('base')
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(wav_file) as source:
+            print(f"Processing WAV audio from: {wav_file}")
+            audio = recognizer.record(source)
         
-        print(f"Processing WAV audio from: {wav_file} with whisper")
-        
-        # Transcribe audio using Whisper
-        result = model.transcribe(wav_file)
-        extracted_text = result['text']
-        
-        print(f"Recognized from WAV with Whisper: {extracted_text}")
+        # Recognize the speech
+        extracted_text = recognizer.recognize_google(audio)
+        print(f"Recognized from WAV: {extracted_text}")
         
         response = process_query(extracted_text, board_id)
         
@@ -138,36 +136,12 @@ def process_wav_file(wav_file, board_id):
         else:
             return {"error": "Unexpected response format from process_query.", "query": extracted_text, "components": []}
     
+    except sr.UnknownValueError:
+        return {"error": "Speech could not be recognized", "query": "", "components": []}
+    except sr.RequestError as e:
+        return {"error": f"Speech recognition service error: {e}", "query": "", "components": []}
     except Exception as e:
-        print(f"Whisper transcription failed: {e}. Falling back to Google Speech Recognition.")
-        
-        # Fall back to speech_recognition
-        try:
-            import speech_recognition as sr
-            recognizer = sr.Recognizer()
-            with sr.AudioFile(wav_file) as source:
-                print(f"Processing WAV audio from: {wav_file} with speech_recognition")
-                audio = recognizer.record(source)
-            
-            # Recognize the speech
-            extracted_text = recognizer.recognize_google(audio)
-            print(f"Recognized from WAV with Google: {extracted_text}")
-            
-            response = process_query(extracted_text, board_id)
-            
-            # Ensure response is a dictionary
-            if isinstance(response, dict):
-                return response
-            else:
-                return {"error": "Unexpected response format from process_query.", "query": extracted_text, "components": []}
-        
-        except sr.UnknownValueError:
-            return {"error": "Speech could not be recognized by either Whisper or Google", "query": "", "components": []}
-        except sr.RequestError as e:
-            return {"error": f"Speech recognition service error: {e}", "query": "", "components": []}
-        except Exception as e:
-            return {"error": f"Both Whisper and Google Speech Recognition failed: {str(e)}", "query": "", "components": []}
-
+        return {"error": str(e), "query": "", "components": []}
 
 
 def process_query(query, board_id=1):
@@ -197,11 +171,11 @@ def process_query(query, board_id=1):
     2. Provide a clear, technically accurate explanation that answers the user's question.
     3. Reference specific components, pins, configurations or code examples as needed.
     4. Balance technical accuracy with accessibility, using proper terminology.
-    5. **If the user asks for the location of a component (e.g., "where is component R7?"), respond with: "I am now illuminating component [component name] on the board."  Replace "[component name]" with the actual component name from the user's query.  Do not consult the documents for location information in this case.**
+    5. **If the user asks for the location of a component (e.g., "where is component R7?", or "show me the debugger", etc), respond with: "I am now illuminating element [component name] on the board."  Replace "[component name]" with the actual component name from the user's query.  Do not consult the documents for location information in this case.**
 
     Please answer other questions based ONLY on the information provided in these documents.
     Write your answer in a sentence format, in a user-friendly manner.
-    Include the source of the information in your answer, such as "According to the manual" or "As per the components list" at the end of your response.
+    Include the source of the information in your answer, such as "According to the manual" or "As per the components list" at the end of your response in all cases.
     If the answer is not found in the provided information, please say "I don't have enough information to answer this question."
         
     MANUAL CONTENT:
